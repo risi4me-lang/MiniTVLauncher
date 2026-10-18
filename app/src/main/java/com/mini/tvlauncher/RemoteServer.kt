@@ -32,6 +32,7 @@ interface RemoteHost {
     fun saveCardImage(pkg: String, bytes: ByteArray): Boolean
     fun resetCardImage(pkg: String): Boolean
     fun resetUsageStats(): Boolean
+    fun getAppIconPng(pkg: String): ByteArray?
 }
 
 /** Tiny dependency-free HTTP server. Access requires valid device key or PIN. */
@@ -179,6 +180,15 @@ class RemoteServer(private val pin: String, private val host: RemoteHost) {
                     "/type" -> {
                         val txt = q["text"] ?: q["t"] ?: ""
                         reply(out, if (host.typeText(txt)) 200 else 400, "text/plain", ByteArray(0))
+                    }
+                    "/icon" -> {
+                        val pkg = q["pkg"] ?: ""
+                        val pngBytes = host.getAppIconPng(pkg)
+                        if (pngBytes != null && pngBytes.isNotEmpty()) {
+                            reply(out, 200, "image/png", pngBytes)
+                        } else {
+                            reply(out, 404, "text/plain", ByteArray(0))
+                        }
                     }
                     "/openlink" -> {
                         var url = q["url"] ?: q["link"] ?: q["u"] ?: ""

@@ -195,6 +195,41 @@ class RemoteService : Service(), RemoteHost {
         }
     }
 
+    override fun getAppIconPng(pkg: String): ByteArray? {
+        return try {
+            val pm = packageManager
+            val iconDrawable = try {
+                pm.getApplicationIcon(pkg)
+            } catch (_: Exception) {
+                val intent = pm.getLaunchIntentForPackage(pkg) ?: pm.getLeanbackLaunchIntentForPackage(pkg)
+                if (intent != null) {
+                    @Suppress("DEPRECATION")
+                    val ri = pm.resolveActivity(intent, 0)
+                    ri?.loadIcon(pm)
+                } else null
+            } ?: return null
+
+            val width = 96
+            val height = 96
+            val bitmap = if (iconDrawable is android.graphics.drawable.BitmapDrawable && iconDrawable.bitmap != null) {
+                Bitmap.createScaledBitmap(iconDrawable.bitmap, width, height, true)
+            } else {
+                val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                val canvas = android.graphics.Canvas(bmp)
+                iconDrawable.setBounds(0, 0, width, height)
+                iconDrawable.draw(canvas)
+                bmp
+            }
+
+            val baos = java.io.ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
+            bitmap.recycle()
+            baos.toByteArray()
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     override fun typeText(text: String): Boolean {
         return RemoteAccessibilityService.instance?.typeText(text) ?: false
     }
@@ -315,6 +350,7 @@ class RemoteService : Service(), RemoteHost {
             put("showSeconds", prefs.getBoolean("clock_show_seconds", false))
             put("showDate", prefs.getBoolean("clock_show_date", true))
             put("sortMode", prefs.getString("app_sort_mode", "alphabetical") ?: "alphabetical")
+            put("homeQrMode", prefs.getString("home_qr_mode", "always") ?: "always")
             put("accessibilityEnabled", RemoteAccessibilityService.isEnabled(this@RemoteService))
         }
         return json.toString()
@@ -329,6 +365,7 @@ class RemoteService : Service(), RemoteHost {
             if (json.has("showSeconds")) editor.putBoolean("clock_show_seconds", json.getBoolean("showSeconds"))
             if (json.has("showDate")) editor.putBoolean("clock_show_date", json.getBoolean("showDate"))
             if (json.has("sortMode")) editor.putString("app_sort_mode", json.getString("sortMode"))
+            if (json.has("homeQrMode")) editor.putString("home_qr_mode", json.getString("homeQrMode"))
             editor.apply()
             val main = MainActivity.activeInstance?.get()
             main?.runOnUiThread { main.reloadAppsAndRefresh() }

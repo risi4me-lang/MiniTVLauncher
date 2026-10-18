@@ -2,18 +2,30 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Mini Remote</title>
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-body { background: #0b0f1a; color: #fff; user-select: none; -webkit-user-select: none; padding-bottom: 76px; }
+:root {
+  --bg-gradient: linear-gradient(135deg, #070a14 0%, #0e1628 50%, #090e1a 100%);
+  --glass-bg: rgba(255, 255, 255, 0.07);
+  --glass-bg-hover: rgba(255, 255, 255, 0.12);
+  --glass-bg-active: rgba(47, 91, 255, 0.35);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-border-light: rgba(255, 255, 255, 0.22);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --accent: #2f5bff;
+  --accent-glow: rgba(47, 91, 255, 0.4);
+}
 
-/* Toast */
-.toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-100px); background: #2f5bff; color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: 500; box-shadow: 0 4px 16px rgba(0,0,0,0.4); opacity: 0; transition: all 0.3s ease; z-index: 1000; pointer-events: none; max-width: 90%; text-align: center; }
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none; -webkit-user-select: none; padding-bottom: 76px; min-height: 100vh; }
+
+/* Toast Notification */
+.toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-100px); background: var(--accent); color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: 500; box-shadow: 0 4px 16px rgba(0,0,0,0.4); opacity: 0; transition: all 0.3s ease; z-index: 1000; pointer-events: none; max-width: 90%; text-align: center; }
 .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 .toast.error { background: #e63946; }
 
-/* Bottom Tab Bar */
-.tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 64px; background: #131b2e; border-top: 1px solid #1f2a48; display: flex; justify-content: space-around; align-items: center; z-index: 200; }
+/* Glass Tab Bar */
+.tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 64px; background: rgba(13, 19, 34, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid var(--glass-border); display: flex; justify-content: space-around; align-items: center; z-index: 200; }
 .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #7080a0; font-size: 11px; font-weight: 500; cursor: pointer; border: none; background: none; gap: 4px; }
-.tab-item.active { color: #2f5bff; }
+.tab-item.active { color: var(--accent); }
 .tab-item svg { width: 22px; height: 22px; fill: currentColor; }
 
 /* Views */
@@ -23,11 +35,11 @@ body { background: #0b0f1a; color: #fff; user-select: none; -webkit-user-select:
 /* Remote Controls */
 .pad-row { display: flex; gap: 8px; max-width: 280px; margin: 8px auto; }
 .dpad-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 280px; margin: 4px auto; }
-.btn-remote { min-height: 56px; border-radius: 16px; border: none; background: #1b2440; color: #fff; font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center; cursor: pointer; touch-action: none; position: relative; flex: 1; }
-.btn-remote:active { background: #2f5bff; }
-.btn-remote.ok { background: #2f5bff; font-size: 16px; }
-.btn-remote.power { background: #2b1d24; color: #ff4d4d; }
-.btn-remote.power:active { background: #ff4d4d; color: #fff; }
+.btn-remote { min-height: 56px; border-radius: 16px; border: 1px solid var(--glass-border); background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: #fff; font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center; cursor: pointer; touch-action: none; position: relative; flex: 1; box-shadow: 0 4px 16px rgba(0,0,0,0.2); transition: all 0.15s ease; }
+.btn-remote:active { background: var(--glass-bg-active); border-color: var(--accent); box-shadow: 0 0 16px var(--accent-glow); }
+.btn-remote.ok { background: var(--accent); border-color: rgba(255,255,255,0.3); font-size: 16px; }
+.btn-remote.power { background: rgba(230, 57, 70, 0.2); border-color: rgba(230, 57, 70, 0.4); color: #ff6b6b; }
+.btn-remote.power:active { background: #e63946; color: #fff; }
 .btn-remote svg { width: 22px; height: 22px; fill: currentColor; }
 
 /* Accessibility Dot Indicator */
@@ -35,46 +47,57 @@ body { background: #0b0f1a; color: #fff; user-select: none; -webkit-user-select:
 .btn-remote.has-dot .dot { display: block; }
 
 /* Swipe Pad */
-.swipe-pad { max-width: 280px; height: 100px; margin: 8px auto; background: #131b2e; border: 2px dashed #2f5bff; border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #8090b0; font-size: 13px; font-weight: 500; gap: 4px; touch-action: none; cursor: pointer; }
-.swipe-pad svg { width: 22px; height: 22px; fill: #2f5bff; }
+.swipe-pad { max-width: 280px; height: 100px; margin: 8px auto; background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 2px dashed var(--accent); border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #a0b0d0; font-size: 13px; font-weight: 500; gap: 4px; touch-action: none; cursor: pointer; }
+.swipe-pad svg { width: 22px; height: 22px; fill: var(--accent); }
 
-.btn-open-tools { width: 100%; max-width: 280px; margin: 8px auto 0; min-height: 48px; background: #1f2a48; border-radius: 14px; border: none; color: #fff; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
+.btn-open-tools { width: 100%; max-width: 280px; margin: 8px auto 0; min-height: 48px; background: rgba(255,255,255,0.08); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: 14px; color: #fff; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
 .btn-open-tools svg { width: 18px; height: 18px; fill: currentColor; }
 
-/* Bottom Sheet */
-.sheet-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); opacity: 0; pointer-events: none; transition: opacity 0.25s ease; z-index: 500; }
+/* Quick Apps Grid */
+.quick-apps-header { display: flex; align-items: center; justify-content: space-between; margin: 18px auto 10px; max-width: 300px; }
+.quick-apps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 300px; margin: 0 auto 16px; }
+.quick-tile { background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: 16px; padding: 10px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; min-height: 88px; transition: all 0.15s ease; }
+.quick-tile:active { background: var(--glass-bg-active); border-color: var(--accent); box-shadow: 0 0 12px var(--accent-glow); }
+.quick-tile-icon { width: 42px; height: 42px; border-radius: 10px; object-fit: cover; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; color: #a0c0ff; }
+.quick-tile-name { font-size: 11px; font-weight: 500; color: #d0e0ff; margin-top: 6px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px; }
+
+.btn-text { background: none; border: none; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; }
+
+/* Glass Bottom Sheet */
+.sheet-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; pointer-events: none; transition: opacity 0.25s ease; z-index: 500; }
 .sheet-backdrop.open { opacity: 1; pointer-events: auto; }
-.sheet { position: fixed; bottom: 0; left: 0; right: 0; background: #131b2e; border-top-left-radius: 24px; border-top-right-radius: 24px; padding: 20px; max-width: 500px; margin: 0 auto; transform: translateY(100%); transition: transform 0.25s cubic-bezier(0.1, 0.9, 0.2, 1); z-index: 501; max-height: 85vh; overflow-y: auto; }
+.sheet { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(13, 19, 34, 0.92); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-top: 1px solid var(--glass-border-light); border-top-left-radius: 28px; border-top-right-radius: 28px; padding: 20px; max-width: 500px; margin: 0 auto; transform: translateY(100%); transition: transform 0.28s cubic-bezier(0.1, 0.9, 0.2, 1); z-index: 501; max-height: 85vh; overflow-y: auto; }
 .sheet.open { transform: translateY(0); }
-.sheet-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; border-bottom: 1px solid #1f2a48; padding-bottom: 12px; }
+.sheet-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; border-bottom: 1px solid var(--glass-border); padding-bottom: 12px; }
 .sheet-title { font-size: 17px; font-weight: 600; color: #fff; }
-.sheet-close { background: #1b2440; border: none; color: #a0b0d0; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.sheet-close { background: var(--glass-bg); border: 1px solid var(--glass-border); color: #a0b0d0; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .sheet-close svg { width: 16px; height: 16px; fill: currentColor; }
 
 /* Cards & Form Controls */
-.section-title { font-size: 12px; font-weight: 600; color: #7080a0; text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 8px; }
-.card { background: #131b2e; border-radius: 16px; padding: 14px; margin-bottom: 10px; }
-.input-field { width: 100%; min-height: 48px; background: #1b2440; border: 1px solid #28365a; border-radius: 12px; color: #fff; padding: 0 14px; font-size: 15px; outline: none; user-select: text; -webkit-user-select: text; }
-.input-field:focus { border-color: #2f5bff; }
-.select-field { width: 100%; min-height: 48px; background: #1b2440; border: 1px solid #28365a; border-radius: 12px; color: #fff; padding: 0 14px; font-size: 15px; outline: none; }
+.section-title { font-size: 12px; font-weight: 600; color: #8090b0; text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 8px; }
+.card { background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: 18px; padding: 14px; margin-bottom: 12px; }
+.input-field { width: 100%; min-height: 48px; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--glass-border); border-radius: 12px; color: #fff; padding: 0 14px; font-size: 15px; outline: none; user-select: text; -webkit-user-select: text; }
+.input-field:focus { border-color: var(--accent); }
+.select-field { width: 100%; min-height: 48px; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--glass-border); border-radius: 12px; color: #fff; padding: 0 14px; font-size: 15px; outline: none; }
 
-.btn { min-height: 48px; border-radius: 12px; border: none; background: #2f5bff; color: #fff; font-size: 15px; font-weight: 600; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; width: 100%; margin-top: 8px; }
-.btn-secondary { background: #1b2440; color: #a0b0d0; }
-.btn-danger { background: #3d1a20; color: #ff4d4d; }
+.btn { min-height: 48px; border-radius: 12px; border: none; background: var(--accent); color: #fff; font-size: 15px; font-weight: 600; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; width: 100%; margin-top: 8px; box-shadow: 0 4px 16px var(--accent-glow); }
+.btn-secondary { background: var(--glass-bg); border: 1px solid var(--glass-border); color: #a0b0d0; box-shadow: none; }
+.btn-danger { background: rgba(230, 57, 70, 0.2); border: 1px solid rgba(230, 57, 70, 0.4); color: #ff6b6b; box-shadow: none; }
 
-/* App Items */
-.app-item { display: flex; align-items: center; justify-content: space-between; background: #131b2e; padding: 12px 16px; border-radius: 14px; margin-bottom: 8px; cursor: pointer; min-height: 56px; }
+/* App List Items */
+.app-item { display: flex; align-items: center; justify-content: space-between; background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--glass-border); padding: 12px 16px; border-radius: 16px; margin-bottom: 8px; cursor: pointer; min-height: 56px; transition: all 0.15s ease; }
+.app-item:active { background: var(--glass-bg-active); border-color: var(--accent); }
 .app-info { display: flex; flex-direction: column; overflow: hidden; margin-right: 12px; }
 .app-name { font-size: 15px; font-weight: 500; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app-meta { font-size: 12px; color: #7080a0; margin-top: 2px; }
 .app-action-icon { color: #7080a0; }
 .app-action-icon svg { width: 20px; height: 20px; fill: currentColor; }
 
-.check-row { display: flex; align-items: center; justify-content: space-between; min-height: 48px; border-bottom: 1px solid #1a233a; }
+.check-row { display: flex; align-items: center; justify-content: space-between; min-height: 48px; border-bottom: 1px solid var(--glass-border); }
 .check-row:last-child { border-bottom: none; }
-.check-row input[type=checkbox] { width: 22px; height: 22px; accent-color: #2f5bff; }
+.check-row input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--accent); }
 
-#loginView { max-width: 360px; margin: 60px auto; text-align: center; padding: 24px; background: #131b2e; border-radius: 24px; }
+#loginView { max-width: 360px; margin: 60px auto; text-align: center; padding: 24px; background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--glass-border); border-radius: 24px; }
 </style>
 </head><body>
 
@@ -122,6 +145,13 @@ body { background: #0b0f1a; color: #fff; user-select: none; -webkit-user-select:
       <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 14H4v-4h11v4zm0-5H4V9h11v4zm5 5h-4V9h4v9z"/></svg>
       Type / Send Link
     </button>
+
+    <!-- Quick Apps Grid Section -->
+    <div class="quick-apps-header">
+      <span class="section-title" style="margin:0">Quick Apps</span>
+      <button class="btn-text" onclick="openEditQuickApps()">Edit</button>
+    </div>
+    <div id="quickAppsGrid" class="quick-apps-grid"></div>
   </div>
 
   <!-- Apps Tab -->
@@ -182,7 +212,7 @@ body { background: #0b0f1a; color: #fff; user-select: none; -webkit-user-select:
 
 </div>
 
-<!-- Bottom Navigation Bar -->
+<!-- Glass Tab Bar -->
 <div class="tab-bar">
   <button class="tab-item active" data-tab="remote" onclick="setTab('remote')">
     <svg viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 3c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm0 13c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm3-5.5H9v-1.5h6v1.5zm0-3H9V9h6v1.5z"/></svg>
@@ -217,6 +247,17 @@ body { background: #0b0f1a; color: #fff; user-select: none; -webkit-user-select:
     <input type="text" id="typeInput" class="input-field" placeholder="Type text or search...">
     <button onclick="sendText()" class="btn">Send Text</button>
   </div>
+</div>
+
+<!-- Edit Quick Apps Bottom Sheet -->
+<div id="editQuickSheet" class="sheet">
+  <div class="sheet-header">
+    <span class="sheet-title">Edit Quick Apps</span>
+    <button class="sheet-close" onclick="closeSheets()"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+  </div>
+  <div id="editQuickAppsList" style="margin-bottom:12px"></div>
+  <button onclick="saveQuickAppsSelection()" class="btn">Save Selection</button>
+  <button onclick="resetQuickAppsSelection()" class="btn btn-secondary">Reset to Default</button>
 </div>
 
 <!-- App Action Bottom Sheet -->
@@ -372,6 +413,11 @@ function api(p, o) {
   });
 }
 
+function getIconUrl(pkg) {
+  const auth = 'key=' + encodeURIComponent(KEY) + '&pin=' + encodeURIComponent(PIN);
+  return '/icon?pkg=' + encodeURIComponent(pkg) + '&' + auth;
+}
+
 function start() {
   api('/apps').then(r => {
     if (!r.ok) throw 0;
@@ -384,6 +430,7 @@ function start() {
     loadFavorites();
     loadHidden();
     renderApps();
+    renderQuickApps();
     loadSettings();
   }).catch(e => {
     if (e.message !== 'Unauthorized') {
@@ -542,6 +589,7 @@ function loadFavorites() {
   api('/favorites').then(r => r.json()).then(data => {
     FAVS = data;
     renderApps();
+    renderQuickApps();
   }).catch(() => {});
 }
 
@@ -549,7 +597,120 @@ function loadHidden() {
   api('/hidden').then(r => r.json()).then(data => {
     HIDDEN = data;
     renderApps();
+    renderQuickApps();
   }).catch(() => {});
+}
+
+function renderQuickApps() {
+  const container = document.getElementById('quickAppsGrid');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const hiddenPkgs = HIDDEN.map(h => h.pkg);
+  let quickList = [];
+
+  const storedCustom = localStorage.getItem('quick_apps_pkgs');
+  if (storedCustom) {
+    try {
+      const customPkgs = JSON.parse(storedCustom);
+      quickList = customPkgs.map(pkg => APPS.find(a => a.pkg === pkg)).filter(a => a && !hiddenPkgs.includes(a.pkg));
+    } catch (_) {}
+  }
+
+  if (quickList.length === 0) {
+    const favApps = FAVS.filter(f => !hiddenPkgs.includes(f.pkg));
+    if (favApps.length > 0) {
+      quickList = favApps;
+    } else {
+      quickList = APPS.filter(a => !hiddenPkgs.includes(a.pkg))
+                      .sort((a, b) => (b.launches || 0) - (a.launches || 0))
+                      .slice(0, 6);
+    }
+  }
+
+  quickList.forEach(app => {
+    const tile = document.createElement('div');
+    tile.className = 'quick-tile';
+    tile.onclick = () => {
+      showToast('Opening ' + app.label + '...');
+      api('/launch?pkg=' + encodeURIComponent(app.pkg), { method: 'POST' });
+    };
+
+    const img = document.createElement('img');
+    img.className = 'quick-tile-icon';
+    img.alt = app.label;
+    img.loading = 'lazy';
+    img.src = getIconUrl(app.pkg);
+
+    img.onerror = function() {
+      const fallback = document.createElement('div');
+      fallback.className = 'quick-tile-icon';
+      fallback.textContent = (app.label || '?').charAt(0).toUpperCase();
+      img.replaceWith(fallback);
+    };
+
+    const name = document.createElement('div');
+    name.className = 'quick-tile-name';
+    name.textContent = app.label;
+
+    tile.appendChild(img);
+    tile.appendChild(name);
+    container.appendChild(tile);
+  });
+}
+
+function openEditQuickApps() {
+  const container = document.getElementById('editQuickAppsList');
+  container.innerHTML = '';
+
+  const storedCustom = localStorage.getItem('quick_apps_pkgs');
+  let selectedPkgs = [];
+  if (storedCustom) {
+    try { selectedPkgs = JSON.parse(storedCustom); } catch (_) {}
+  } else {
+    selectedPkgs = FAVS.map(f => f.pkg);
+  }
+
+  const hiddenPkgs = HIDDEN.map(h => h.pkg);
+  const visibleApps = APPS.filter(a => !hiddenPkgs.includes(a.pkg));
+
+  visibleApps.forEach(app => {
+    const row = document.createElement('div');
+    row.className = 'check-row';
+
+    const span = document.createElement('span');
+    span.textContent = app.label;
+
+    const chk = document.createElement('input');
+    chk.type = 'checkbox';
+    chk.checked = selectedPkgs.includes(app.pkg);
+    chk.dataset.pkg = app.pkg;
+
+    row.appendChild(span);
+    row.appendChild(chk);
+    container.appendChild(row);
+  });
+
+  openSheet('editQuickSheet');
+}
+
+function saveQuickAppsSelection() {
+  const chks = document.querySelectorAll('#editQuickAppsList input[type=checkbox]');
+  const selected = [];
+  chks.forEach(c => {
+    if (c.checked) selected.push(c.dataset.pkg);
+  });
+  localStorage.setItem('quick_apps_pkgs', JSON.stringify(selected));
+  renderQuickApps();
+  closeSheets();
+  showToast('Quick apps saved');
+}
+
+function resetQuickAppsSelection() {
+  localStorage.removeItem('quick_apps_pkgs');
+  renderQuickApps();
+  closeSheets();
+  showToast('Reset to default Quick apps');
 }
 
 function openAppSheet(pkg) {
@@ -641,7 +802,6 @@ function renderApps() {
   const favPkgs = FAVS.map(f => f.pkg);
   const hiddenPkgs = HIDDEN.map(h => h.pkg);
 
-  // Favorites Section (only shown if has items)
   const matchingFavs = APPS.filter(a => favPkgs.includes(a.pkg) && !hiddenPkgs.includes(a.pkg) && a.label.toLowerCase().includes(filter));
   if (matchingFavs.length > 0) {
     const title = document.createElement('div');
@@ -652,7 +812,6 @@ function renderApps() {
     matchingFavs.forEach(a => container.appendChild(createAppItem(a, true)));
   }
 
-  // All Apps Section
   const titleAll = document.createElement('div');
   titleAll.className = 'section-title';
   titleAll.textContent = 'All Apps';
@@ -661,7 +820,6 @@ function renderApps() {
   const visibleApps = APPS.filter(a => !hiddenPkgs.includes(a.pkg) && a.label.toLowerCase().includes(filter));
   visibleApps.forEach(a => container.appendChild(createAppItem(a, false)));
 
-  // Hidden Section (only shown if has items)
   const matchingHidden = APPS.filter(a => hiddenPkgs.includes(a.pkg) && a.label.toLowerCase().includes(filter));
   if (matchingHidden.length > 0) {
     const titleHid = document.createElement('div');
