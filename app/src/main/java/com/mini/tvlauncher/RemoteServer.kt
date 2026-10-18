@@ -30,6 +30,7 @@ interface RemoteHost {
     fun openLink(url: String): String?
     fun performPower(): String?
     fun renameApp(pkg: String, newName: String): Boolean
+    fun setUserCategory(pkg: String, category: String): Boolean
     fun saveCardImage(pkg: String, bytes: ByteArray): Boolean
     fun resetCardImage(pkg: String): Boolean
     fun resetUsageStats(): Boolean
@@ -245,6 +246,22 @@ class RemoteServer(private val pin: String, private val host: RemoteHost) {
                             } catch (_: Exception) {}
                         }
                         val ok = host.renameApp(pkg, name)
+                        reply(out, if (ok) 200 else 400, "application/json", "{\"status\":\"ok\"}".toByteArray())
+                    }
+                    "/category" -> {
+                        var pkg = q["pkg"] ?: ""
+                        var cat = q["category"] ?: q["cat"] ?: ""
+                        if (len in 1..100_000) {
+                            val b = ByteArray(len)
+                            var n = 0
+                            while (n < len) { val r = inp.read(b, n, len - n); if (r < 0) break; n += r }
+                            try {
+                                val obj = JSONObject(String(b, Charsets.UTF_8))
+                                if (obj.has("pkg")) pkg = obj.getString("pkg")
+                                if (obj.has("category")) cat = obj.getString("category")
+                            } catch (_: Exception) {}
+                        }
+                        val ok = host.setUserCategory(pkg, cat)
                         reply(out, if (ok) 200 else 400, "application/json", "{\"status\":\"ok\"}".toByteArray())
                     }
                     "/cardimage" -> {

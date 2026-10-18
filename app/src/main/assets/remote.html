@@ -193,6 +193,10 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
         <span>Show Date</span>
         <input type="checkbox" id="showDate">
       </div>
+      <div class="check-row">
+        <span>Group Apps by Category</span>
+        <input type="checkbox" id="groupByCategory">
+      </div>
       <div style="margin-top:12px">
         <label class="section-title">Sort Apps By</label>
         <select id="sortMode" class="select-field">
@@ -297,6 +301,17 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
   <button id="btnSheetHide" onclick="sheetAction('hide')" class="btn btn-secondary">Hide App</button>
 
   <div class="card" style="margin-top:12px">
+    <label class="section-title">Category</label>
+    <select id="appCatSelect" class="select-field" onchange="sheetCategoryChange(this)">
+      <option value="">Automatic (Default)</option>
+      <option value="Entertainment">Entertainment</option>
+      <option value="Games">Games</option>
+      <option value="Productivity & Tools">Productivity & Tools</option>
+      <option value="Others">Others</option>
+    </select>
+  </div>
+
+  <div class="card">
     <label class="section-title">Rename App</label>
     <input type="text" id="appRenameInput" class="input-field" placeholder="Enter new display name">
     <div style="display:flex;gap:8px;margin-top:8px">
@@ -777,6 +792,19 @@ function openAppSheet(pkg) {
   openSheet('appSheet');
 }
 
+function sheetCategoryChange(select) {
+  if (!currentApp) return;
+  const pkg = currentApp.pkg;
+  const val = select.value;
+  api('/category', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pkg: pkg, category: val })
+  }).then(r => {
+    if (r.ok) { showToast('Category updated'); start(); closeSheets(); }
+  });
+}
+
 function sheetAction(act) {
   if (!currentApp) return;
   const pkg = currentApp.pkg;
@@ -921,6 +949,7 @@ function loadSettings() {
     document.getElementById('showDate').checked = !!s.showDate;
     document.getElementById('sortMode').value = s.sortMode || 'alphabetical';
     document.getElementById('homeQrMode').value = s.homeQrMode || 'always';
+    document.getElementById('groupByCategory').checked = s.groupByCategory !== false;
     updateAccDots(s.accessibilityEnabled !== false);
   }).catch(() => {});
 }
@@ -932,7 +961,8 @@ function saveSettings() {
     showSeconds: document.getElementById('showSeconds').checked,
     showDate: document.getElementById('showDate').checked,
     sortMode: document.getElementById('sortMode').value,
-    homeQrMode: document.getElementById('homeQrMode').value
+    homeQrMode: document.getElementById('homeQrMode').value,
+    groupByCategory: document.getElementById('groupByCategory').checked
   };
   api('/settings', {
     method: 'POST',

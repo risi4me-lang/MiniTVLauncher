@@ -129,7 +129,7 @@ class RemoteService : Service(), RemoteHost {
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
                 val label = ri.loadLabel(pm).toString()
-                list.add(AppEntry(label, label, pkg, i, null, null, 0))
+                list.add(AppEntry(label, label, pkg, i, null, null, 0, appInfo = ri.activityInfo.applicationInfo))
             }
         }
         return AppUtils.processAppList(list, prefs, filesDir)
@@ -302,6 +302,13 @@ class RemoteService : Service(), RemoteHost {
         return true
     }
 
+    override fun setUserCategory(pkg: String, category: String): Boolean {
+        AppUtils.setUserCategory(prefs, pkg, category)
+        val main = MainActivity.activeInstance?.get()
+        main?.runOnUiThread { main.reloadAppsAndRefresh() }
+        return true
+    }
+
     override fun saveCardImage(pkg: String, bytes: ByteArray): Boolean {
         val ok = AppUtils.downscaleAndSaveCardImage(filesDir, pkg, bytes)
         if (ok) {
@@ -379,6 +386,7 @@ class RemoteService : Service(), RemoteHost {
             put("showDate", prefs.getBoolean("clock_show_date", true))
             put("sortMode", prefs.getString("app_sort_mode", "alphabetical") ?: "alphabetical")
             put("homeQrMode", prefs.getString("home_qr_mode", "always") ?: "always")
+            put("groupByCategory", prefs.getBoolean("group_by_category", true))
             put("accessibilityEnabled", RemoteAccessibilityService.isEnabled(this@RemoteService))
         }
         return json.toString()
@@ -394,6 +402,7 @@ class RemoteService : Service(), RemoteHost {
             if (json.has("showDate")) editor.putBoolean("clock_show_date", json.getBoolean("showDate"))
             if (json.has("sortMode")) editor.putString("app_sort_mode", json.getString("sortMode"))
             if (json.has("homeQrMode")) editor.putString("home_qr_mode", json.getString("homeQrMode"))
+            if (json.has("groupByCategory")) editor.putBoolean("group_by_category", json.getBoolean("groupByCategory"))
             editor.apply()
             val main = MainActivity.activeInstance?.get()
             main?.runOnUiThread { main.reloadAppsAndRefresh() }

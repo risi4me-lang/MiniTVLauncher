@@ -53,7 +53,8 @@ data class AppEntry(
     val icon: Drawable?,
     val averageColor: Int,
     val launchCount: Int = 0,
-    val hasCustomImage: Boolean = false
+    val hasCustomImage: Boolean = false,
+    val appInfo: ApplicationInfo? = null
 )
 
 data class ToolTile(
@@ -61,6 +62,11 @@ data class ToolTile(
     val label: String,
     val iconRes: Int,
     val intent: Intent
+)
+
+data class CategoryRowItem(
+    val title: String,
+    val apps: List<AppEntry>
 )
 
 private data class ShortcutCandidate(
@@ -82,13 +88,13 @@ class MainActivity : Activity() {
     @Volatile private var allInstalledApps: List<AppEntry> = emptyList()
     @Volatile private var currentVisibleApps: List<AppEntry> = emptyList()
 
-    private lateinit var adapter: AppAdapter
-    private lateinit var favoritesAdapter: AppAdapter
     private lateinit var wallpaper: ImageView
-    private lateinit var grid: RecyclerView
-    private lateinit var favoritesRow: RecyclerView
-    private lateinit var favoritesLabel: TextView
+    private lateinit var rowsContainer: RecyclerView
     private lateinit var toolsRow: RecyclerView
+
+    private val sharedViewPool = RecyclerView.RecycledViewPool().apply {
+        setMaxRecycledViews(0, 20)
+    }
 
     private lateinit var searchPillBtn: TextView
     private lateinit var searchPanel: FrameLayout
@@ -115,7 +121,7 @@ class MainActivity : Activity() {
     }
 
     private val prefChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == "user_name" || key == "clock_is_12h" || key == "clock_show_seconds" || key == "clock_show_date" || key == "favorite_pkgs_json" || key == "hidden_pkgs_json" || key == "app_rename_map" || key == "app_launch_counts" || key == "app_sort_mode") {
+        if (key == "user_name" || key == "clock_is_12h" || key == "clock_show_seconds" || key == "clock_show_date" || key == "favorite_pkgs_json" || key == "hidden_pkgs_json" || key == "app_rename_map" || key == "app_category_map" || key == "group_by_category" || key == "app_launch_counts" || key == "app_sort_mode") {
             runOnUiThread { applySettings(); reloadAppsAndRefresh() }
         } else if (key == "preset" || key == "custom" || key == "wallpaper_version") {
             runOnUiThread { applyWallpaper() }
@@ -147,10 +153,10 @@ class MainActivity : Activity() {
         prefs.registerOnSharedPreferenceChangeListener(prefChangeListener)
 
         wallpaper = findViewById(R.id.wallpaper)
-        grid = findViewById(R.id.grid)
         toolsRow = findViewById(R.id.toolsRow)
-        favoritesRow = findViewById(R.id.favoritesRow)
-        favoritesLabel = findViewById(R.id.favoritesLabel)
+        rowsContainer = findViewById(R.id.rowsContainer)
+
+        rowsContainer.layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
 
         searchPillBtn = findViewById(R.id.searchPillBtn)
         searchPanel = findViewById(R.id.searchPanel)
@@ -179,16 +185,6 @@ class MainActivity : Activity() {
         // Setup Tools Row
         toolsRow.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         refreshToolsRow()
-
-        // Setup Favorites Row
-        favoritesRow.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        favoritesAdapter = AppAdapter(favoritesRow, onAppClick = { launch(it) }, onAppLongClick = { entry, view -> showAppContextMenu(entry, view) })
-        favoritesRow.adapter = favoritesAdapter
-
-        // Setup Main Apps Grid
-        grid.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        adapter = AppAdapter(grid, onAppClick = { launch(it) }, onAppLongClick = { entry, view -> showAppContextMenu(entry, view) })
-        grid.adapter = adapter
 
         val wallpaperBtn = findViewById<View>(R.id.wallpaperBtn)
         wallpaperBtn.setOnClickListener { chooseWallpaper() }
@@ -599,16 +595,40 @@ class MainActivity : Activity() {
         val favPkgs = getFavoritePkgs()
         val favApps = favPkgs.mapNotNull { pkg -> visibleApps.firstOrNull { it.pkg == pkg } }
 
-        if (favApps.isNotEmpty()) {
-            favoritesLabel.visibility = View.VISIBLE
-            favoritesRow.visibility = View.VISIBLE
-            favoritesAdapter.submit(favApps)
+        val groupByCategory = prefs.getBoolean("group_by_category", true)
+        val rowItems = ArrayList<CategoryRowItem>()
+
+        if (groupByCategory) {
+            // Categorized Mode: Favorites -> Entertainment -> Games -> Productivity & Tools -> Others
+            if (favApps.isNotEmpty()) {
+                rowItems.add(CategoryRowItem(AppUtils.CAT_FAVORITES, favApps))
+            }
+
+            val nonFavVisible = visibleApps.filter { !favPkgs.contains(it.pkg) }
+
+            val entApps = nonFavVisible.filter { AppUtils.getAppCategory(it, prefs) == AppUtils.CAT_ENTERTAINMENT }
+            if (entApps.isNotEmpty()) rowItems.add(CategoryRowItem(AppUtils.CAT_ENTERTAINMENT, entApps))
+
+            val gameApps = nonFavVisible.filter { AppUtils.getAppCategory(it, prefs) == AppUtils.CAT_GAMES }
+            if (gameApps.isNotEmpty()) rowItems.add(CategoryRowItem(AppUtils.CAT_GAMES, gameApps))
+
+            val prodApps = nonFavVisible.filter { AppUtils.getAppCategory(it, prefs) == AppUtils.CAT_PRODUCTIVITY }
+            if (prodApps.isNotEmpty()) rowItems.add(CategoryRowItem(AppUtils.CAT_PRODUCTIVITY, prodApps))
+
+            val otherApps = nonFavVisible.filter { AppUtils.getAppCategory(it, prefs) == AppUtils.CAT_OTHERS }
+            if (otherApps.isNotEmpty()) rowItems.add(CategoryRowItem(AppUtils.CAT_OTHERS, otherApps))
         } else {
-            favoritesLabel.visibility = View.GONE
-            favoritesRow.visibility = View.GONE
+            // Single A-Z / Most used row
+            if (favApps.isNotEmpty()) {
+                rowItems.add(CategoryRowItem(AppUtils.CAT_FAVORITES, favApps))
+            }
+            val remainingApps = visibleApps.filter { !favPkgs.contains(it.pkg) }
+            if (remainingApps.isNotEmpty()) {
+                rowItems.add(CategoryRowItem("Apps", remainingApps))
+            }
         }
 
-        adapter.submit(visibleApps)
+        rowsContainer.adapter = CategoryRowAdapter(rowItems, sharedViewPool, onAppClick = { launch(it) }, onAppLongClick = { entry, view -> showAppContextMenu(entry, view) })
         refreshHiddenAppsUi()
     }
 
@@ -624,15 +644,16 @@ class MainActivity : Activity() {
         } catch (_: Exception) { false }
 
         val imageActionText = if (appEntry.hasCustomImage) "Reset custom card image" else "Change card image"
-        val options = arrayOf(favActionText, "Rename", imageActionText, "Hide", "App info", "Uninstall")
+        val options = arrayOf(favActionText, "Move to category", "Rename", imageActionText, "Hide", "App info", "Uninstall")
 
         val builder = AlertDialog.Builder(this)
             .setTitle(appEntry.label)
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> updateFavorite(appEntry.pkg, !isFav)
-                    1 -> showRenameDialog(appEntry)
-                    2 -> {
+                    1 -> showMoveCategoryDialog(appEntry)
+                    2 -> showRenameDialog(appEntry)
+                    3 -> {
                         if (appEntry.hasCustomImage) {
                             AppUtils.resetCardImage(filesDir, appEntry.pkg)
                             reloadAppsAndRefresh()
@@ -641,9 +662,9 @@ class MainActivity : Activity() {
                             Toast.makeText(this, "Upload custom image from phone remote page", Toast.LENGTH_LONG).show()
                         }
                     }
-                    3 -> updateHidden(appEntry.pkg, true)
-                    4 -> openAppInfo(appEntry.pkg)
-                    5 -> {
+                    4 -> updateHidden(appEntry.pkg, true)
+                    5 -> openAppInfo(appEntry.pkg)
+                    6 -> {
                         if (isSystem) {
                             Toast.makeText(this, "System app cannot be uninstalled", Toast.LENGTH_SHORT).show()
                         } else {
@@ -658,6 +679,19 @@ class MainActivity : Activity() {
             anchorView.requestFocus()
         }
         dialog.show()
+    }
+
+    private fun showMoveCategoryDialog(appEntry: AppEntry) {
+        val categories = arrayOf("Automatic (Default)", AppUtils.CAT_ENTERTAINMENT, AppUtils.CAT_GAMES, AppUtils.CAT_PRODUCTIVITY, AppUtils.CAT_OTHERS)
+        AlertDialog.Builder(this)
+            .setTitle("Move ${appEntry.label} to Category")
+            .setItems(categories) { _, which ->
+                val selected = if (which == 0) "" else categories[which]
+                AppUtils.setUserCategory(prefs, appEntry.pkg, selected)
+                reloadAppsAndRefresh()
+                Toast.makeText(this, "Category updated", Toast.LENGTH_SHORT).show()
+            }
+            .show()
     }
 
     private fun showRenameDialog(appEntry: AppEntry) {
@@ -1086,7 +1120,7 @@ class MainActivity : Activity() {
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
-        grid.scrollToPosition(0)
+        rowsContainer.scrollToPosition(0)
     }
 
     private fun launch(e: AppEntry) {
@@ -1198,7 +1232,8 @@ class MainActivity : Activity() {
                                 intent = target,
                                 banner = null,
                                 icon = iconDrawable,
-                                averageColor = candidate.averageColor
+                                averageColor = candidate.averageColor,
+                                appInfo = target.component?.let { pm.getApplicationInfo(it.packageName, 0) }
                             )
                         )
                         break
@@ -1229,7 +1264,7 @@ class MainActivity : Activity() {
                     val avgColor = if (banner == null && icon != null) extractAverageColor(icon) else 0xFF1B2440.toInt()
 
                     val defaultLabel = ri.loadLabel(pm).toString()
-                    installedApps.add(AppEntry(defaultLabel, defaultLabel, pkg, i, banner, icon, avgColor))
+                    installedApps.add(AppEntry(defaultLabel, defaultLabel, pkg, i, banner, icon, avgColor, appInfo = ri.activityInfo.applicationInfo))
                 }
             }
             list.addAll(installedApps)
@@ -1344,6 +1379,40 @@ class MainActivity : Activity() {
             if (!ok) runOnUiThread { Toast.makeText(this, "Couldn't load image", Toast.LENGTH_SHORT).show() }
         }
     }
+}
+
+class CategoryRowAdapter(
+    private val rows: List<CategoryRowItem>,
+    private val sharedViewPool: RecyclerView.RecycledViewPool,
+    private val onAppClick: (AppEntry) -> Unit,
+    private val onAppLongClick: (AppEntry, View) -> Unit
+) : RecyclerView.Adapter<CategoryRowAdapter.VH>() {
+
+    class VH(v: View) : RecyclerView.ViewHolder(v) {
+        val rowTitle: TextView = v.findViewById(R.id.rowTitle)
+        val rowRecyclerView: RecyclerView = v.findViewById(R.id.rowRecyclerView)
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
+        val v = LayoutInflater.from(parent.context).inflate(R.layout.item_category_row, parent, false)
+        val h = VH(v)
+        h.rowRecyclerView.layoutManager = LinearLayoutManager(parent.context, LinearLayoutManager.HORIZONTAL, false).apply {
+            initialPrefetchItemCount = 2
+        }
+        h.rowRecyclerView.setRecycledViewPool(sharedViewPool)
+        h.rowRecyclerView.setHasFixedSize(true)
+        return h
+    }
+
+    override fun onBindViewHolder(holder: VH, position: Int) {
+        val row = rows[position]
+        holder.rowTitle.text = row.title.uppercase(Locale.US)
+        val adapter = AppAdapter(holder.rowRecyclerView, onAppClick, onAppLongClick)
+        holder.rowRecyclerView.adapter = adapter
+        adapter.submit(row.apps)
+    }
+
+    override fun getItemCount() = rows.size
 }
 
 class ToolsAdapter(
