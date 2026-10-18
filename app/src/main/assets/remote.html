@@ -1,151 +1,248 @@
 <!DOCTYPE html><html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mini Launcher Remote</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Mini Remote</title>
 <style>
-body{margin:0;background:#0b0f1a;color:#fff;font-family:sans-serif;padding:16px;user-select:none;-webkit-user-select:none}
-h3{margin:18px 0 8px;color:#9ab}
-button,input,select{font-size:18px;border-radius:12px;border:0;background:#1b2440;color:#fff;padding:14px;touch-action:none;user-select:none;-webkit-user-select:none}
-.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:300px;margin:auto}
-.pad button{height:60px;touch-action:none;user-select:none;-webkit-user-select:none}.ok{background:#2f5bff}
-.swipe-pad{
-  max-width:300px;
-  height:130px;
-  margin:14px auto 0;
-  background:#131b2e;
-  border:2px dashed #2f5bff;
-  border-radius:16px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  color:#9ab;
-  font-size:16px;
-  font-weight:bold;
-  touch-action:none;
-  user-select:none;
-  -webkit-user-select:none;
-  cursor:pointer;
-}
-.app-row{display:flex;align-items:center;justify-content:space-between;background:#131b2e;padding:10px 14px;border-radius:12px;margin:6px 0}
-.app-row span{flex:1;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:8px;user-select:text;-webkit-user-select:text}
-.app-row button{font-size:14px;padding:8px 12px;margin-left:6px;touch-action:auto}
-.app-card-editor{background:#131b2e;border-radius:12px;padding:12px;margin:8px 0}
-.app-card-title{font-size:16px;font-weight:bold;margin-bottom:8px;display:flex;justify-content:space-between}
-.app-card-sub{font-size:12px;color:#9ab;font-weight:normal}
-.editor-controls{display:flex;flex-direction:column;gap:8px;margin-top:8px}
-.editor-row{display:flex;gap:8px;align-items:center}
-input[type=text],input[type=password],select{width:100%;box-sizing:border-box;touch-action:auto;user-select:text;-webkit-user-select:text}
-.box{background:#131b2e;padding:16px;border-radius:12px;margin-top:8px}
-.row{margin-bottom:12px}
-.lbl{display:block;margin-bottom:4px;color:#9ab;font-size:14px}
-.check-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-.check-row input{width:24px;height:24px;accent-color:#2f5bff}
-.btn-sm{font-size:13px;padding:6px 12px;border-radius:8px}
-.btn-danger{background:#8e2a2a}
-</style></head><body>
-<div id="login"><h3>Enter PIN shown on TV</h3>
-<input id="pin" type="password" inputmode="numeric" placeholder="PIN">
-<button onclick="go()" style="margin-top:10px;width:100%">Connect</button></div>
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+body { background: #0b0f1a; color: #fff; user-select: none; -webkit-user-select: none; padding-bottom: 76px; }
 
-<div id="main" style="display:none">
+/* Toast */
+.toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-100px); background: #2f5bff; color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: 500; box-shadow: 0 4px 16px rgba(0,0,0,0.4); opacity: 0; transition: all 0.3s ease; z-index: 1000; pointer-events: none; max-width: 90%; text-align: center; }
+.toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+.toast.error { background: #e63946; }
 
-<div id="connError" style="display:none;background:#8e2a2a;color:#fff;padding:10px;text-align:center;font-size:14px;margin-bottom:12px;border-radius:12px;font-weight:bold">
-  ⚠️ TV not reachable
+/* Bottom Tab Bar */
+.tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 64px; background: #131b2e; border-top: 1px solid #1f2a48; display: flex; justify-content: space-around; align-items: center; z-index: 200; }
+.tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #7080a0; font-size: 11px; font-weight: 500; cursor: pointer; border: none; background: none; gap: 4px; }
+.tab-item.active { color: #2f5bff; }
+.tab-item svg { width: 22px; height: 22px; fill: currentColor; }
+
+/* Views */
+.view { display: none; padding: 12px 16px; max-width: 440px; margin: 0 auto; }
+.view.active { display: block; }
+
+/* Remote Controls */
+.pad-row { display: flex; gap: 8px; max-width: 280px; margin: 8px auto; }
+.dpad-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 280px; margin: 4px auto; }
+.btn-remote { min-height: 56px; border-radius: 16px; border: none; background: #1b2440; color: #fff; font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center; cursor: pointer; touch-action: none; position: relative; flex: 1; }
+.btn-remote:active { background: #2f5bff; }
+.btn-remote.ok { background: #2f5bff; font-size: 16px; }
+.btn-remote.power { background: #2b1d24; color: #ff4d4d; }
+.btn-remote.power:active { background: #ff4d4d; color: #fff; }
+.btn-remote svg { width: 22px; height: 22px; fill: currentColor; }
+
+/* Accessibility Dot Indicator */
+.dot { position: absolute; top: 6px; right: 8px; width: 6px; height: 6px; border-radius: 50%; background: #ff4d4d; display: none; }
+.btn-remote.has-dot .dot { display: block; }
+
+/* Swipe Pad */
+.swipe-pad { max-width: 280px; height: 100px; margin: 8px auto; background: #131b2e; border: 2px dashed #2f5bff; border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #8090b0; font-size: 13px; font-weight: 500; gap: 4px; touch-action: none; cursor: pointer; }
+.swipe-pad svg { width: 22px; height: 22px; fill: #2f5bff; }
+
+.btn-open-tools { width: 100%; max-width: 280px; margin: 8px auto 0; min-height: 48px; background: #1f2a48; border-radius: 14px; border: none; color: #fff; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
+.btn-open-tools svg { width: 18px; height: 18px; fill: currentColor; }
+
+/* Bottom Sheet */
+.sheet-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); opacity: 0; pointer-events: none; transition: opacity 0.25s ease; z-index: 500; }
+.sheet-backdrop.open { opacity: 1; pointer-events: auto; }
+.sheet { position: fixed; bottom: 0; left: 0; right: 0; background: #131b2e; border-top-left-radius: 24px; border-top-right-radius: 24px; padding: 20px; max-width: 500px; margin: 0 auto; transform: translateY(100%); transition: transform 0.25s cubic-bezier(0.1, 0.9, 0.2, 1); z-index: 501; max-height: 85vh; overflow-y: auto; }
+.sheet.open { transform: translateY(0); }
+.sheet-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; border-bottom: 1px solid #1f2a48; padding-bottom: 12px; }
+.sheet-title { font-size: 17px; font-weight: 600; color: #fff; }
+.sheet-close { background: #1b2440; border: none; color: #a0b0d0; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.sheet-close svg { width: 16px; height: 16px; fill: currentColor; }
+
+/* Cards & Form Controls */
+.section-title { font-size: 12px; font-weight: 600; color: #7080a0; text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 8px; }
+.card { background: #131b2e; border-radius: 16px; padding: 14px; margin-bottom: 10px; }
+.input-field { width: 100%; min-height: 48px; background: #1b2440; border: 1px solid #28365a; border-radius: 12px; color: #fff; padding: 0 14px; font-size: 15px; outline: none; user-select: text; -webkit-user-select: text; }
+.input-field:focus { border-color: #2f5bff; }
+.select-field { width: 100%; min-height: 48px; background: #1b2440; border: 1px solid #28365a; border-radius: 12px; color: #fff; padding: 0 14px; font-size: 15px; outline: none; }
+
+.btn { min-height: 48px; border-radius: 12px; border: none; background: #2f5bff; color: #fff; font-size: 15px; font-weight: 600; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; width: 100%; margin-top: 8px; }
+.btn-secondary { background: #1b2440; color: #a0b0d0; }
+.btn-danger { background: #3d1a20; color: #ff4d4d; }
+
+/* App Items */
+.app-item { display: flex; align-items: center; justify-content: space-between; background: #131b2e; padding: 12px 16px; border-radius: 14px; margin-bottom: 8px; cursor: pointer; min-height: 56px; }
+.app-info { display: flex; flex-direction: column; overflow: hidden; margin-right: 12px; }
+.app-name { font-size: 15px; font-weight: 500; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app-meta { font-size: 12px; color: #7080a0; margin-top: 2px; }
+.app-action-icon { color: #7080a0; }
+.app-action-icon svg { width: 20px; height: 20px; fill: currentColor; }
+
+.check-row { display: flex; align-items: center; justify-content: space-between; min-height: 48px; border-bottom: 1px solid #1a233a; }
+.check-row:last-child { border-bottom: none; }
+.check-row input[type=checkbox] { width: 22px; height: 22px; accent-color: #2f5bff; }
+
+#loginView { max-width: 360px; margin: 60px auto; text-align: center; padding: 24px; background: #131b2e; border-radius: 24px; }
+</style>
+</head><body>
+
+<div id="toast" class="toast"></div>
+
+<!-- Login Container -->
+<div id="loginView">
+  <h3 style="margin-bottom:12px;color:#fff">Pair Remote</h3>
+  <p style="color:#7080a0;font-size:14px;margin-bottom:16px">Enter 4-digit PIN shown on TV</p>
+  <input id="pin" type="password" class="input-field" inputmode="numeric" placeholder="PIN" style="text-align:center;letter-spacing:4px">
+  <button onclick="go()" class="btn" style="margin-top:16px">Connect</button>
 </div>
 
-<div id="accNote" style="display:none;background:#3d1a1a;color:#ffadad;padding:12px;border-radius:12px;margin-bottom:16px;font-size:14px;line-height:1.4">
-  ⚠️ <b>Note:</b> Accessibility Service is disabled on TV. Enable <i>Mini Launcher Remote Service</i> in TV Settings &rarr; Accessibility for global Back/Home, Power, and text typing in other apps.
-</div>
+<!-- Main App Container -->
+<div id="mainView" style="display:none">
 
-<!-- D-pad Navigation Pad -->
-<div class="pad" oncontextmenu="return false;">
-  <span></span><button id="btnUp">&#9650;</button><span></span>
-  <button id="btnLeft">&#9664;</button><button id="btnOk" class="ok">OK</button><button id="btnRight">&#9654;</button>
-  <span></span><button id="btnDown">&#9660;</button><span></span>
-</div>
+  <!-- Remote Tab -->
+  <div id="view-remote" class="view">
+    <div class="dpad-grid" oncontextmenu="return false;">
+      <span></span><button id="btnUp" class="btn-remote"><svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg></button><span></span>
+      <button id="btnLeft" class="btn-remote"><svg viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6z"/></svg></button>
+      <button id="btnOk" class="btn-remote ok">OK</button>
+      <button id="btnRight" class="btn-remote"><svg viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg></button>
+      <span></span><button id="btnDown" class="btn-remote"><svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg></button><span></span>
+    </div>
 
-<!-- Swipe Pad -->
-<div id="swipeArea" class="swipe-pad" oncontextmenu="return false;">
-  👆 Swipe / Tap
-</div>
+    <div id="swipeArea" class="swipe-pad" oncontextmenu="return false;">
+      <svg viewBox="0 0 24 24"><path d="M9 11.24V7.5C9 6.12 10.12 5 11.5 5S14 6.12 14 7.5v3.74c1.21-.81 2-2.18 2-3.74C16 5.01 13.99 3 11.5 3S7 5.01 7 7.5c0 1.56.79 2.93 2 3.74zM18.8 13c-.45-.45-1.08-.7-1.74-.63-.73.08-1.36.56-1.63 1.25l-.8 2.01c-.13.33-.45.55-.8.55h-4.38c-.37 0-.7-.22-.84-.57l-1.92-4.8c-.28-.7-.98-1.16-1.73-1.16-.99 0-1.8.81-1.8 1.8 0 .28.06.55.19.79l2.76 5.07C6.67 18.8 8.01 20 9.53 20h6.14c1.27 0 2.45-.63 3.16-1.68l2.25-3.37c.39-.58.31-1.37-.28-1.95L18.8 13z"/></svg>
+      <span>Swipe or Tap</span>
+    </div>
 
-<!-- Global Navigation: Back, Home, Power -->
-<div class="pad" style="margin-top:12px" oncontextmenu="return false;">
-  <button id="btnBack" style="background:#253050">&#8617; Back</button>
-  <button id="btnHome" style="background:#2f3b60">&#8962; Home</button>
-  <button id="btnPower" style="background:#8e2a2a">&#9889; Power</button>
-</div>
+    <div class="pad-row" oncontextmenu="return false;">
+      <button id="btnBack" class="btn-remote"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg><span class="dot"></span></button>
+      <button id="btnHome" class="btn-remote"><svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg><span class="dot"></span></button>
+      <button id="btnPower" class="btn-remote power"><svg viewBox="0 0 24 24"><path d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.17C4.21 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.21-5.18-3.17-6.83z"/></svg><span class="dot"></span></button>
+    </div>
 
-<!-- Volume Controls -->
-<div class="pad" style="margin-top:10px" oncontextmenu="return false;">
-  <button id="btnVolDown">&#128067; Vol -</button>
-  <button id="btnVolMute" style="background:#2f3b60">&#128069; Mute</button>
-  <button id="btnVolUp">&#128266; Vol +</button>
-</div>
+    <div class="pad-row" oncontextmenu="return false;">
+      <button id="btnVolDown" class="btn-remote"><svg viewBox="0 0 24 24"><path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"/></svg></button>
+      <button id="btnVolMute" class="btn-remote"><svg viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73 4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg></button>
+      <button id="btnVolUp" class="btn-remote"><svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg></button>
+    </div>
 
-<!-- Send Link to TV -->
-<h3>Send Link to TV</h3>
-<div class="box" style="display:flex;gap:8px">
-  <input type="text" id="linkInput" placeholder="https://youtube.com/watch?v=..." style="flex:1">
-  <button onclick="sendLink()" style="background:#2f5bff">Send Link</button>
-</div>
-
-<!-- Text Typing Input -->
-<h3>Type Text to TV</h3>
-<div class="box" style="display:flex;gap:8px">
-  <input type="text" id="typeInput" placeholder="Type message or text" style="flex:1">
-  <button onclick="sendText()" style="background:#2f5bff">Send Text</button>
-</div>
-
-<!-- Favorites Section -->
-<h3>Favorites</h3>
-<div id="favList" class="box" style="padding:8px"></div>
-
-<!-- Hidden Apps Section -->
-<h3>Hidden Apps</h3>
-<div id="hiddenList" class="box" style="padding:8px"></div>
-
-<!-- Settings Section -->
-<h3>Settings</h3>
-<div class="box">
-  <div class="row">
-    <span class="lbl">Your Name</span>
-    <input type="text" id="userName" placeholder="Enter name">
+    <button onclick="openSheet('toolsSheet')" class="btn-open-tools">
+      <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 14H4v-4h11v4zm0-5H4V9h11v4zm5 5h-4V9h4v9z"/></svg>
+      Type / Send Link
+    </button>
   </div>
-  <div class="row">
-    <span class="lbl">Clock Format</span>
-    <select id="is12h">
-      <option value="true">12-hour (1:30 PM)</option>
-      <option value="false">24-hour (13:30)</option>
-    </select>
+
+  <!-- Apps Tab -->
+  <div id="view-apps" class="view">
+    <input type="text" id="q" class="input-field" placeholder="Search apps..." oninput="renderApps()">
+    <div id="appsList" style="margin-top:12px"></div>
   </div>
-  <div class="check-row">
-    <span>Show Seconds</span>
-    <input type="checkbox" id="showSeconds">
+
+  <!-- Settings Tab -->
+  <div id="view-settings" class="view">
+    <div class="card">
+      <div style="margin-bottom:12px">
+        <label class="section-title">Your Name</label>
+        <input type="text" id="userName" class="input-field" placeholder="Enter name">
+      </div>
+      <div style="margin-bottom:12px">
+        <label class="section-title">Clock Format</label>
+        <select id="is12h" class="select-field">
+          <option value="true">12-hour (1:30 PM)</option>
+          <option value="false">24-hour (13:30)</option>
+        </select>
+      </div>
+      <div class="check-row">
+        <span>Show Seconds</span>
+        <input type="checkbox" id="showSeconds">
+      </div>
+      <div class="check-row">
+        <span>Show Date</span>
+        <input type="checkbox" id="showDate">
+      </div>
+      <div style="margin-top:12px">
+        <label class="section-title">Sort Apps By</label>
+        <select id="sortMode" class="select-field">
+          <option value="alphabetical">A-Z (Alphabetical)</option>
+          <option value="most_used">Most Used</option>
+        </select>
+      </div>
+      <button onclick="saveSettings()" class="btn">Save Settings</button>
+      <button onclick="resetUsageStats()" class="btn btn-secondary">Reset Usage Stats</button>
+    </div>
+
+    <div class="card">
+      <label class="section-title">Wallpaper</label>
+      <label class="btn btn-secondary">
+        Upload Custom Wallpaper
+        <input type="file" accept="image/*" id="wp" onchange="up(this)" style="display:none">
+      </label>
+    </div>
   </div>
-  <div class="check-row">
-    <span>Show Date</span>
-    <input type="checkbox" id="showDate">
-  </div>
-  <div class="row">
-    <span class="lbl">Sort Apps By</span>
-    <select id="sortMode">
-      <option value="alphabetical">A-Z (Alphabetical)</option>
-      <option value="most_used">Most Used</option>
-    </select>
-  </div>
-  <button onclick="saveSettings()" style="width:100%;background:#2f5bff;margin-top:8px">Save Settings</button>
-  <button onclick="resetUsageStats()" style="width:100%;background:#3b4252;margin-top:8px">Reset Usage Stats</button>
+
 </div>
 
-<h3>Wallpaper</h3>
-<input type="file" accept="image/*" id="wp" onchange="up()">
+<!-- Bottom Navigation Bar -->
+<div class="tab-bar">
+  <button class="tab-item active" data-tab="remote" onclick="setTab('remote')">
+    <svg viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 3c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm0 13c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm3-5.5H9v-1.5h6v1.5zm0-3H9V9h6v1.5z"/></svg>
+    Remote
+  </button>
+  <button class="tab-item" data-tab="apps" onclick="setTab('apps')">
+    <svg viewBox="0 0 24 24"><path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"/></svg>
+    Apps
+  </button>
+  <button class="tab-item" data-tab="settings" onclick="setTab('settings')">
+    <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+    Settings
+  </button>
+</div>
 
-<h3>App Editor (Rename & Restyle)</h3>
-<div id="appEditorList"></div>
+<!-- Backdrop -->
+<div id="backdrop" class="sheet-backdrop" onclick="closeSheets()"></div>
 
-<h3>All Apps</h3>
-<input type="text" id="q" placeholder="Search apps" oninput="render()">
-<div id="apps" style="margin-top:8px"></div></div>
+<!-- Tools Bottom Sheet (Type / Send Link) -->
+<div id="toolsSheet" class="sheet">
+  <div class="sheet-header">
+    <span class="sheet-title">Type & Send Link</span>
+    <button class="sheet-close" onclick="closeSheets()"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+  </div>
+  <div class="card">
+    <label class="section-title">Send Link to TV</label>
+    <input type="text" id="linkInput" class="input-field" placeholder="https://youtube.com/watch?v=...">
+    <button onclick="sendLink()" class="btn">Send Link</button>
+  </div>
+  <div class="card">
+    <label class="section-title">Type Text to TV</label>
+    <input type="text" id="typeInput" class="input-field" placeholder="Type text or search...">
+    <button onclick="sendText()" class="btn">Send Text</button>
+  </div>
+</div>
+
+<!-- App Action Bottom Sheet -->
+<div id="appSheet" class="sheet">
+  <div class="sheet-header">
+    <div>
+      <div id="appSheetTitle" class="sheet-title">App Name</div>
+      <div id="appSheetPkg" style="font-size:12px;color:#7080a0;margin-top:2px">com.example.pkg</div>
+    </div>
+    <button class="sheet-close" onclick="closeSheets()"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+  </div>
+
+  <button onclick="sheetAction('launch')" class="btn">Launch App</button>
+  <button id="btnSheetPin" onclick="sheetAction('pin')" class="btn btn-secondary">Pin to Favorites</button>
+  <button id="btnSheetHide" onclick="sheetAction('hide')" class="btn btn-secondary">Hide App</button>
+
+  <div class="card" style="margin-top:12px">
+    <label class="section-title">Rename App</label>
+    <input type="text" id="appRenameInput" class="input-field" placeholder="Enter new display name">
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button onclick="sheetAction('rename')" class="btn" style="flex:1">Save</button>
+      <button onclick="sheetAction('resetRename')" class="btn btn-secondary" style="flex:1">Reset Name</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <label class="section-title">Card Image</label>
+    <label class="btn btn-secondary">
+      Upload Image (480x270)
+      <input type="file" accept="image/*" id="appImgFile" onchange="sheetUploadImg(this)" style="display:none">
+    </label>
+    <button id="btnSheetResetImg" onclick="sheetAction('resetImg')" class="btn btn-danger" style="display:none">Reset Image</button>
+  </div>
+</div>
 
 <script>
 let KEY = localStorage.getItem('device_key') || '';
@@ -154,26 +251,55 @@ let APPS = [], FAVS = [], HIDDEN = [];
 
 let keyQueue = [];
 let consecutiveFailures = 0;
+let accEnabled = true;
+let currentApp = null;
 
 if (window.PAIRED_KEY) {
   KEY = window.PAIRED_KEY;
   localStorage.setItem('device_key', KEY);
 }
 
-if (KEY || PIN) {
-  start();
-}
+if (KEY || PIN) start();
 
 function go() {
   PIN = document.getElementById('pin').value;
   start();
 }
 
-// Queue and Throttle Key Requests (~12 per second / 83ms interval)
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  clearTimeout(t.timer);
+  t.timer = setTimeout(() => { t.className = 'toast'; }, 2600);
+}
+
+function setTab(tabName) {
+  document.querySelectorAll('.tab-item').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tabName);
+  });
+  document.querySelectorAll('.view').forEach(v => {
+    v.classList.toggle('active', v.id === 'view-' + tabName);
+  });
+  localStorage.setItem('activeTab', tabName);
+}
+
+const savedTab = localStorage.getItem('activeTab') || 'remote';
+setTab(savedTab);
+
+function openSheet(id) {
+  document.getElementById('backdrop').classList.add('open');
+  document.getElementById(id).classList.add('open');
+}
+
+function closeSheets() {
+  document.getElementById('backdrop').classList.remove('open');
+  document.querySelectorAll('.sheet').forEach(s => s.classList.remove('open'));
+}
+
+// Throttled Key Queue
 function queueKey(kName) {
-  if (keyQueue.length >= 5) {
-    keyQueue.splice(0, keyQueue.length - 4);
-  }
+  if (keyQueue.length >= 5) keyQueue.splice(0, keyQueue.length - 4);
   keyQueue.push(kName);
 }
 
@@ -190,33 +316,27 @@ function sendKeyRequest(kName) {
   fetch(url, { method: 'POST' }).then(r => {
     if (r.ok) {
       consecutiveFailures = 0;
-      document.getElementById('connError').style.display = 'none';
     } else if (r.status === 401) {
       handleAuthError();
     } else {
       handleConnFailure();
+      showToast('D-pad only works on launcher screen', true);
     }
-  }).catch(() => {
-    handleConnFailure();
-  });
+  }).catch(() => handleConnFailure());
 }
 
 function handleConnFailure() {
   consecutiveFailures++;
   if (consecutiveFailures >= 3) {
-    document.getElementById('connError').style.display = 'block';
+    showToast('TV not reachable', true);
   }
 }
 
 function handleAuthError() {
-  if (KEY) {
-    localStorage.removeItem('device_key');
-    KEY = '';
-  }
-  sessionStorage.removeItem('pin');
-  PIN = '';
-  main.style.display = 'none';
-  login.style.display = 'block';
+  if (KEY) { localStorage.removeItem('device_key'); KEY = ''; }
+  sessionStorage.removeItem('pin'); PIN = '';
+  document.getElementById('mainView').style.display = 'none';
+  document.getElementById('loginView').style.display = 'block';
 }
 
 function api(p, o) {
@@ -228,7 +348,6 @@ function api(p, o) {
       throw new Error('Unauthorized');
     } else {
       consecutiveFailures = 0;
-      document.getElementById('connError').style.display = 'none';
     }
     return r;
   }).catch(e => {
@@ -244,18 +363,31 @@ function start() {
   }).then(a => {
     if (PIN) sessionStorage.setItem('pin', PIN);
     APPS = a;
-    login.style.display = 'none';
-    main.style.display = 'block';
+    document.getElementById('loginView').style.display = 'none';
+    document.getElementById('mainView').style.display = 'block';
     loadFavorites();
     loadHidden();
-    render();
-    renderAppEditor();
+    renderApps();
     loadSettings();
   }).catch(e => {
     if (e.message !== 'Unauthorized') {
       sessionStorage.removeItem('pin');
-      alert('Wrong PIN or Invalid Key');
+      showToast('Wrong PIN or Invalid Key', true);
     }
+  });
+}
+
+function checkAccAndWarn() {
+  if (!accEnabled) {
+    showToast('Accessibility disabled on TV (enable in Settings)', true);
+  }
+}
+
+function updateAccDots(enabled) {
+  accEnabled = enabled;
+  ['btnBack', 'btnHome', 'btnPower'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.classList.toggle('has-dot', !enabled);
   });
 }
 
@@ -293,10 +425,11 @@ bindHoldRepeat(document.getElementById('btnDown'), 'down');
 bindHoldRepeat(document.getElementById('btnLeft'), 'left');
 bindHoldRepeat(document.getElementById('btnRight'), 'right');
 bindHoldRepeat(document.getElementById('btnOk'), 'ok');
-bindHoldRepeat(document.getElementById('btnBack'), 'back');
-bindHoldRepeat(document.getElementById('btnHome'), 'home');
 
-// Swipe Pad Pointer Handling
+document.getElementById('btnBack').addEventListener('click', () => { checkAccAndWarn(); queueKey('back'); });
+document.getElementById('btnHome').addEventListener('click', () => { checkAccAndWarn(); queueKey('home'); });
+
+// Swipe Pad
 const swipeArea = document.getElementById('swipeArea');
 let startX = 0, startY = 0, startTime = 0;
 let lastStepX = 0, lastStepY = 0;
@@ -304,24 +437,17 @@ let hasMoved = false;
 
 swipeArea.addEventListener('pointerdown', (e) => {
   e.preventDefault();
-  if (swipeArea.setPointerCapture) {
-    try { swipeArea.setPointerCapture(e.pointerId); } catch (_) {}
-  }
-  startX = e.clientX;
-  startY = e.clientY;
-  lastStepX = startX;
-  lastStepY = startY;
-  startTime = Date.now();
-  hasMoved = false;
+  if (swipeArea.setPointerCapture) { try { swipeArea.setPointerCapture(e.pointerId); } catch (_) {} }
+  startX = e.clientX; startY = e.clientY;
+  lastStepX = startX; lastStepY = startY;
+  startTime = Date.now(); hasMoved = false;
 });
 
 swipeArea.addEventListener('pointermove', (e) => {
   if (!startTime) return;
   e.preventDefault();
-
   const dx = e.clientX - lastStepX;
   const dy = e.clientY - lastStepY;
-
   if (Math.abs(dx) >= 45 || Math.abs(dy) >= 45) {
     let dir = '';
     if (Math.abs(dx) >= Math.abs(dy)) {
@@ -342,317 +468,244 @@ function endSwipe(e) {
   const totalDx = Math.abs(e.clientX - startX);
   const totalDy = Math.abs(e.clientY - startY);
   const dt = Date.now() - startTime;
-
   if (dt < 250 && totalDx < 15 && totalDy < 15 && !hasMoved) {
     queueKey('ok');
     if (navigator.vibrate) navigator.vibrate(15);
   }
   startTime = 0;
 }
-
 swipeArea.addEventListener('pointerup', endSwipe);
 swipeArea.addEventListener('pointercancel', endSwipe);
 
-// Volume & Power Buttons
-function bindVol(element, action) {
-  element.addEventListener('click', (e) => {
-    e.preventDefault();
-    api('/volume?action=' + action, { method: 'POST' });
-    if (navigator.vibrate) navigator.vibrate(15);
-  });
-}
-bindVol(document.getElementById('btnVolUp'), 'up');
-bindVol(document.getElementById('btnVolDown'), 'down');
-bindVol(document.getElementById('btnVolMute'), 'mute');
+// Volume & Power
+document.getElementById('btnVolUp').addEventListener('click', () => api('/volume?action=up', { method: 'POST' }));
+document.getElementById('btnVolDown').addEventListener('click', () => api('/volume?action=down', { method: 'POST' }));
+document.getElementById('btnVolMute').addEventListener('click', () => api('/volume?action=mute', { method: 'POST' }));
 
-function sendPower() {
+document.getElementById('btnPower').addEventListener('click', () => {
+  checkAccAndWarn();
   api('/power', { method: 'POST' }).then(r => {
-    if (!r.ok) {
-      r.text().then(msg => {
-        alert(msg || 'Power menu not supported on this device');
-      }).catch(() => alert('Power menu not supported on this device'));
-    }
-  }).catch(() => alert('Power menu not supported on this device'));
-  if (navigator.vibrate) navigator.vibrate(15);
-}
-document.getElementById('btnPower').addEventListener('click', sendPower);
+    if (!r.ok) showToast('Power menu not supported', true);
+  }).catch(() => showToast('Power menu failed', true));
+});
 
 function sendLink() {
   const url = document.getElementById('linkInput').value.trim();
   if (!url) return;
   if (!url.toLowerCase().startsWith('http://') && !url.toLowerCase().startsWith('https://')) {
-    alert('Only http and https links are supported');
-    return;
-  }
-  if (url.length > 2000) {
-    alert('Link is too long (max 2000 characters)');
+    showToast('Only http and https links allowed', true);
     return;
   }
   api('/openlink?url=' + encodeURIComponent(url), { method: 'POST' }).then(r => {
     if (r.ok) {
       document.getElementById('linkInput').value = '';
-      alert('Link opened on TV');
+      closeSheets();
+      showToast('Link opened on TV');
     } else {
-      r.text().then(msg => {
-        alert(msg || 'No app on the TV can open this link');
-      }).catch(() => alert('No app on the TV can open this link'));
+      showToast('No app on TV can open link', true);
     }
-  }).catch(() => alert('No app on the TV can open this link'));
+  }).catch(() => showToast('Failed to send link', true));
 }
 
-function sendText(){
+function sendText() {
+  checkAccAndWarn();
   const t = document.getElementById('typeInput').value;
-  if(!t) return;
-  api('/type?text=' + encodeURIComponent(t), {method:'POST'}).then(r => {
-    if(r.ok) {
+  if (!t) return;
+  api('/type?text=' + encodeURIComponent(t), { method: 'POST' }).then(r => {
+    if (r.ok) {
       document.getElementById('typeInput').value = '';
+      closeSheets();
+      showToast('Text typed on TV');
     } else {
-      alert('Typing failed. Ensure input field is focused on TV and Accessibility Service is enabled.');
+      showToast('Typing failed', true);
     }
   });
 }
 
-function loadFavorites(){
-  api('/favorites').then(r=>r.json()).then(data=>{
+function loadFavorites() {
+  api('/favorites').then(r => r.json()).then(data => {
     FAVS = data;
-    renderFavs();
-  }).catch(()=>{});
+    renderApps();
+  }).catch(() => {});
 }
 
-function loadHidden(){
-  api('/hidden').then(r=>r.json()).then(data=>{
+function loadHidden() {
+  api('/hidden').then(r => r.json()).then(data => {
     HIDDEN = data;
-    renderHidden();
-  }).catch(()=>{});
+    renderApps();
+  }).catch(() => {});
 }
 
-function updateFav(pkg, pinned){
-  api('/favorites', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({pkg: pkg, pinned: pinned})
-  }).then(r=>{
-    if(r.ok) { loadFavorites(); }
-  });
+function openAppSheet(pkg) {
+  const app = APPS.find(a => a.pkg === pkg);
+  if (!app) return;
+  currentApp = app;
+
+  document.getElementById('appSheetTitle').textContent = app.label;
+  document.getElementById('appSheetPkg').textContent = app.pkg + ' • Launches: ' + (app.launches || 0);
+  document.getElementById('appRenameInput').value = app.label;
+
+  const isFav = FAVS.some(f => f.pkg === pkg);
+  const isHid = HIDDEN.some(h => h.pkg === pkg);
+
+  document.getElementById('btnSheetPin').textContent = isFav ? 'Unpin from Favorites' : 'Pin to Favorites';
+  document.getElementById('btnSheetHide').textContent = isHid ? 'Unhide App' : 'Hide App';
+  document.getElementById('btnSheetResetImg').style.display = app.hasCustomImage ? 'block' : 'none';
+
+  openSheet('appSheet');
 }
 
-function updateHid(pkg, hidden){
-  api('/hidden', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({pkg: pkg, hidden: hidden})
-  }).then(r=>{
-    if(r.ok) { loadHidden(); loadFavorites(); }
-  });
-}
+function sheetAction(act) {
+  if (!currentApp) return;
+  const pkg = currentApp.pkg;
 
-function renderFavs(){
-  favList.innerHTML = FAVS.length === 0 ? '<div style="padding:8px;color:#8090a8;font-size:14px">No favorite apps</div>' : '';
-  FAVS.forEach(item => {
-    const d = document.createElement('div');
-    d.className = 'app-row';
-    d.innerHTML = '<span>' + escapeHtml(item.label) + '</span>';
-    const b = document.createElement('button');
-    b.className = 'btn-sm btn-danger';
-    b.textContent = 'Unpin';
-    b.onclick = () => updateFav(item.pkg, false);
-    d.appendChild(b);
-    favList.appendChild(d);
-  });
-}
-
-function renderHidden(){
-  hiddenList.innerHTML = HIDDEN.length === 0 ? '<div style="padding:8px;color:#8090a8;font-size:14px">No hidden apps</div>' : '';
-  HIDDEN.forEach(item => {
-    const d = document.createElement('div');
-    d.className = 'app-row';
-    d.innerHTML = '<span>' + escapeHtml(item.label) + '</span>';
-    const b = document.createElement('button');
-    b.className = 'btn-sm';
-    b.textContent = 'Unhide';
-    b.onclick = () => updateHid(item.pkg, false);
-    d.appendChild(b);
-    hiddenList.appendChild(d);
-  });
-}
-
-function renameApp(pkg, newName) {
-  api('/rename', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ pkg: pkg, name: newName })
-  }).then(r => {
-    if (r.ok) start();
-  });
-}
-
-function uploadCardImage(pkg, file) {
-  if (!file) return;
-  api('/cardimage?pkg=' + encodeURIComponent(pkg), {
-    method: 'POST',
-    body: file
-  }).then(r => {
-    if (r.ok) {
-      alert('Custom card image saved');
-      start();
-    } else {
-      alert('Image upload failed');
-    }
-  });
-}
-
-function resetCardImage(pkg) {
-  api('/cardimage?pkg=' + encodeURIComponent(pkg) + '&action=reset', {
-    method: 'POST'
-  }).then(r => {
-    if (r.ok) {
-      alert('Card image reset to default');
-      start();
-    }
-  });
-}
-
-function resetUsageStats() {
-  if (confirm('Reset launch counts for all apps?')) {
-    api('/resetusage', { method: 'POST' }).then(r => {
-      if (r.ok) {
-        alert('Usage stats reset');
-        start();
-      }
+  if (act === 'launch') {
+    api('/launch?pkg=' + encodeURIComponent(pkg), { method: 'POST' }).then(r => {
+      if (r.ok) showToast('Launched ' + currentApp.label);
+      closeSheets();
+    });
+  } else if (act === 'pin') {
+    const isFav = FAVS.some(f => f.pkg === pkg);
+    api('/favorites', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pkg: pkg, pinned: !isFav })
+    }).then(r => {
+      if (r.ok) { showToast(isFav ? 'Unpinned' : 'Pinned'); start(); closeSheets(); }
+    });
+  } else if (act === 'hide') {
+    const isHid = HIDDEN.some(h => h.pkg === pkg);
+    api('/hidden', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pkg: pkg, hidden: !isHid })
+    }).then(r => {
+      if (r.ok) { showToast(isHid ? 'Unhidden' : 'Hidden'); start(); closeSheets(); }
+    });
+  } else if (act === 'rename') {
+    const newName = document.getElementById('appRenameInput').value.trim();
+    api('/rename', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pkg: pkg, name: newName })
+    }).then(r => {
+      if (r.ok) { showToast('Renamed'); start(); closeSheets(); }
+    });
+  } else if (act === 'resetRename') {
+    api('/rename', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pkg: pkg, name: '' })
+    }).then(r => {
+      if (r.ok) { showToast('Name reset'); start(); closeSheets(); }
+    });
+  } else if (act === 'resetImg') {
+    api('/cardimage?pkg=' + encodeURIComponent(pkg) + '&action=reset', { method: 'POST' }).then(r => {
+      if (r.ok) { showToast('Image reset'); start(); closeSheets(); }
     });
   }
 }
 
-function renderAppEditor() {
-  const container = document.getElementById('appEditorList');
+function sheetUploadImg(input) {
+  if (!currentApp || !input.files || !input.files[0]) return;
+  api('/cardimage?pkg=' + encodeURIComponent(currentApp.pkg), {
+    method: 'POST',
+    body: input.files[0]
+  }).then(r => {
+    if (r.ok) { showToast('Image updated'); start(); closeSheets(); }
+    else showToast('Upload failed', true);
+  });
+}
+
+function renderApps() {
+  const container = document.getElementById('appsList');
   container.innerHTML = '';
-  APPS.forEach(a => {
-    const card = document.createElement('div');
-    card.className = 'app-card-editor';
+  const filter = document.getElementById('q').value.toLowerCase();
 
-    const header = document.createElement('div');
-    header.className = 'app-card-title';
-    header.innerHTML = escapeHtml(a.label) + '<span class="app-card-sub">Launches: ' + (a.launches || 0) + '</span>';
-    card.appendChild(header);
+  const favPkgs = FAVS.map(f => f.pkg);
+  const hiddenPkgs = HIDDEN.map(h => h.pkg);
 
-    const controls = document.createElement('div');
-    controls.className = 'editor-controls';
+  // Favorites Section (only shown if has items)
+  const matchingFavs = APPS.filter(a => favPkgs.includes(a.pkg) && !hiddenPkgs.includes(a.pkg) && a.label.toLowerCase().includes(filter));
+  if (matchingFavs.length > 0) {
+    const title = document.createElement('div');
+    title.className = 'section-title';
+    title.textContent = 'Favorites';
+    container.appendChild(title);
 
-    // Rename Row
-    const renameRow = document.createElement('div');
-    renameRow.className = 'editor-row';
-    const nameInput = document.createElement('input');
-    nameInput.type = 'text';
-    nameInput.value = a.label;
-    nameInput.placeholder = a.defaultLabel || 'App Name';
+    matchingFavs.forEach(a => container.appendChild(createAppItem(a, true)));
+  }
 
-    const saveNameBtn = document.createElement('button');
-    saveNameBtn.className = 'btn-sm';
-    saveNameBtn.textContent = 'Rename';
-    saveNameBtn.onclick = () => renameApp(a.pkg, nameInput.value);
+  // All Apps Section
+  const titleAll = document.createElement('div');
+  titleAll.className = 'section-title';
+  titleAll.textContent = 'All Apps';
+  container.appendChild(titleAll);
 
-    const resetNameBtn = document.createElement('button');
-    resetNameBtn.className = 'btn-sm';
-    resetNameBtn.textContent = 'Reset Name';
-    resetNameBtn.onclick = () => renameApp(a.pkg, '');
+  const visibleApps = APPS.filter(a => !hiddenPkgs.includes(a.pkg) && a.label.toLowerCase().includes(filter));
+  visibleApps.forEach(a => container.appendChild(createAppItem(a, false)));
 
-    renameRow.appendChild(nameInput);
-    renameRow.appendChild(saveNameBtn);
-    renameRow.appendChild(resetNameBtn);
-    controls.appendChild(renameRow);
+  // Hidden Section (only shown if has items)
+  const matchingHidden = APPS.filter(a => hiddenPkgs.includes(a.pkg) && a.label.toLowerCase().includes(filter));
+  if (matchingHidden.length > 0) {
+    const titleHid = document.createElement('div');
+    titleHid.className = 'section-title';
+    titleHid.textContent = 'Hidden Apps';
+    container.appendChild(titleHid);
 
-    // Custom Image Row
-    const imgRow = document.createElement('div');
-    imgRow.className = 'editor-row';
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = 'image/*';
-    fileInput.style.fontSize = '12px';
+    matchingHidden.forEach(a => container.appendChild(createAppItem(a, false, true)));
+  }
+}
 
-    const uploadBtn = document.createElement('button');
-    uploadBtn.className = 'btn-sm';
-    uploadBtn.textContent = 'Upload Image';
-    uploadBtn.onclick = () => {
-      if (fileInput.files && fileInput.files[0]) {
-        uploadCardImage(a.pkg, fileInput.files[0]);
-      } else {
-        alert('Please choose an image file first');
-      }
-    };
+function createAppItem(a, isFav, isHid) {
+  const d = document.createElement('div');
+  d.className = 'app-item';
+  d.onclick = () => openAppSheet(a.pkg);
 
-    imgRow.appendChild(fileInput);
-    imgRow.appendChild(uploadBtn);
+  const info = document.createElement('div');
+  info.className = 'app-info';
 
-    if (a.hasCustomImage) {
-      const resetImgBtn = document.createElement('button');
-      resetImgBtn.className = 'btn-sm btn-danger';
-      resetImgBtn.textContent = 'Reset Image';
-      resetImgBtn.onclick = () => resetCardImage(a.pkg);
-      imgRow.appendChild(resetImgBtn);
-    }
+  const name = document.createElement('div');
+  name.className = 'app-name';
+  name.textContent = a.label;
 
-    controls.appendChild(imgRow);
-    card.appendChild(controls);
-    container.appendChild(card);
+  const meta = document.createElement('div');
+  meta.className = 'app-meta';
+  meta.textContent = (isFav ? 'Favorite • ' : '') + (isHid ? 'Hidden • ' : '') + 'Launches: ' + (a.launches || 0);
+
+  info.appendChild(name);
+  info.appendChild(meta);
+  d.appendChild(info);
+
+  const icon = document.createElement('div');
+  icon.className = 'app-action-icon';
+  icon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>';
+  d.appendChild(icon);
+
+  return d;
+}
+
+function up(input) {
+  const f = input.files[0];
+  if (!f) return;
+  api('/wallpaper', { method: 'POST', body: f }).then(r => {
+    if (r.ok) showToast('Wallpaper updated');
+    else showToast('Wallpaper upload failed', true);
   });
 }
 
-function render(){
-  const t=q.value.toLowerCase();
-  apps.innerHTML='';
-  const favPkgs = FAVS.map(f=>f.pkg);
-  APPS.filter(a=>a.label.toLowerCase().includes(t)).forEach(a=>{
-    const d=document.createElement('div');
-    d.className = 'app-row';
-    const nameSpan = document.createElement('span');
-    nameSpan.textContent = a.label + (a.launches ? ' (' + a.launches + ')' : '');
-    nameSpan.style.cursor = 'pointer';
-    nameSpan.onclick = () => api('/launch?pkg='+encodeURIComponent(a.pkg),{method:'POST'});
-    d.appendChild(nameSpan);
-
-    const isFav = favPkgs.includes(a.pkg);
-    const favBtn = document.createElement('button');
-    favBtn.className = 'btn-sm';
-    favBtn.textContent = isFav ? 'Unpin' : 'Pin';
-    favBtn.onclick = () => updateFav(a.pkg, !isFav);
-    d.appendChild(favBtn);
-
-    const hideBtn = document.createElement('button');
-    hideBtn.className = 'btn-sm btn-danger';
-    hideBtn.textContent = 'Hide';
-    hideBtn.onclick = () => updateHid(a.pkg, true);
-    d.appendChild(hideBtn);
-
-    apps.appendChild(d);
-  });
-}
-
-function escapeHtml(str) {
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function up(){
-  const f=wp.files[0];
-  if(!f)return;
-  api('/wallpaper',{method:'POST',body:f}).then(r=>alert(r.ok?'Wallpaper updated':'Upload failed (max 8 MB)'));
-}
-
-function loadSettings(){
-  api('/settings').then(r=>r.json()).then(s=>{
+function loadSettings() {
+  api('/settings').then(r => r.json()).then(s => {
     document.getElementById('userName').value = s.userName || '';
     document.getElementById('is12h').value = s.is12h ? 'true' : 'false';
     document.getElementById('showSeconds').checked = !!s.showSeconds;
     document.getElementById('showDate').checked = !!s.showDate;
     document.getElementById('sortMode').value = s.sortMode || 'alphabetical';
-    if (s.accessibilityEnabled === false) {
-      document.getElementById('accNote').style.display = 'block';
-    } else {
-      document.getElementById('accNote').style.display = 'none';
-    }
-  }).catch(()=>{});
+    updateAccDots(s.accessibilityEnabled !== false);
+  }).catch(() => {});
 }
 
-function saveSettings(){
+function saveSettings() {
   const data = {
     userName: document.getElementById('userName').value.trim(),
     is12h: document.getElementById('is12h').value === 'true',
@@ -662,13 +715,17 @@ function saveSettings(){
   };
   api('/settings', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r=>{
-    if(r.ok) {
-      alert('Settings saved');
-      start();
-    } else alert('Failed to save settings');
-  }).catch(()=>alert('Network error'));
+  }).then(r => {
+    if (r.ok) { showToast('Settings saved'); start(); }
+    else showToast('Failed to save settings', true);
+  }).catch(() => showToast('Network error', true));
+}
+
+function resetUsageStats() {
+  api('/resetusage', { method: 'POST' }).then(r => {
+    if (r.ok) { showToast('Usage stats reset'); start(); }
+  });
 }
 </script></body></html>
