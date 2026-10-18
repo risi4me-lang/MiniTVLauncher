@@ -161,19 +161,35 @@ class RemoteAccessibilityService : AccessibilityService() {
         }
     }
 
-    fun typeText(text: String): Boolean {
+    fun typeText(text: String, action: String = ""): Boolean {
         val root = rootInActiveWindow ?: return false
         val focusedNode = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
             ?: findFocusedEditText(root)
 
         if (focusedNode != null) {
-            val args = Bundle().apply {
-                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
+            if (text.isNotEmpty() || action.isEmpty()) {
+                val args = Bundle().apply {
+                    putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
+                }
+                focusedNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
             }
-            val ok = focusedNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+
+            if (action == "enter") {
+                var enterDone = false
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    val actionImeEnter = 0x00000010
+                    enterDone = focusedNode.performAction(actionImeEnter)
+                }
+                if (!enterDone) {
+                    val submitNode = findNearestClickableAncestor(focusedNode)
+                    submitNode?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                    submitNode?.recycle()
+                }
+            }
+
             focusedNode.recycle()
             root.recycle()
-            return ok
+            return true
         }
         root.recycle()
         return false

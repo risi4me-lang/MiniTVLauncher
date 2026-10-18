@@ -230,8 +230,36 @@ class RemoteService : Service(), RemoteHost {
         }
     }
 
-    override fun typeText(text: String): Boolean {
-        return RemoteAccessibilityService.instance?.typeText(text) ?: false
+    override fun typeText(text: String, action: String): Boolean {
+        val main = MainActivity.activeInstance?.get()
+        if (main != null && main.isSearchPanelOpen()) {
+            main.handleLiveTypeFromRemote(text, action)
+            return true
+        }
+        return RemoteAccessibilityService.instance?.typeText(text, action) ?: false
+    }
+
+    override fun triggerVoice(): String? {
+        val main = MainActivity.activeInstance?.get()
+        if (main != null) {
+            return main.triggerVoiceSearch()
+        }
+        return try {
+            val pm = packageManager
+            val intent = Intent("android.speech.action.VOICE_SEARCH_HANDS_FREE").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            @Suppress("DEPRECATION")
+            val matches = pm.queryIntentActivities(intent, 0)
+            if (matches.isNotEmpty()) {
+                startActivity(intent)
+                null
+            } else {
+                "Use the mic on your phone keyboard"
+            }
+        } catch (_: Exception) {
+            "Use the mic on your phone keyboard"
+        }
     }
 
     override fun openLink(url: String): String? {

@@ -2,6 +2,7 @@ package com.mini.tvlauncher
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.SearchManager
 import android.content.*
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -23,6 +24,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.*
 import android.view.animation.DecelerateInterpolator
 import android.widget.*
@@ -87,6 +90,11 @@ class MainActivity : Activity() {
     private lateinit var favoritesLabel: TextView
     private lateinit var toolsRow: RecyclerView
 
+    private lateinit var searchPillBtn: TextView
+    private lateinit var searchPanel: FrameLayout
+    private lateinit var searchInput: EditText
+    private lateinit var searchAppResults: LinearLayout
+
     private lateinit var homeQrCard: LinearLayout
     private lateinit var homeQrImageView: ImageView
     private lateinit var homeQrCaption: TextView
@@ -97,7 +105,7 @@ class MainActivity : Activity() {
     private val qrRefreshRunnable = object : Runnable {
         override fun run() {
             refreshHomeQrCode()
-            qrHandler.postDelayed(this, 90_000L) // Regenerate every 90 seconds
+            qrHandler.postDelayed(this, 90_000L)
         }
     }
 
@@ -143,6 +151,20 @@ class MainActivity : Activity() {
         toolsRow = findViewById(R.id.toolsRow)
         favoritesRow = findViewById(R.id.favoritesRow)
         favoritesLabel = findViewById(R.id.favoritesLabel)
+
+        searchPillBtn = findViewById(R.id.searchPillBtn)
+        searchPanel = findViewById(R.id.searchPanel)
+        searchInput = findViewById(R.id.searchInput)
+        searchAppResults = findViewById(R.id.searchAppResults)
+
+        searchPillBtn.setOnClickListener { openSearchPanel() }
+        searchPillBtn.setOnFocusChangeListener { v, focused ->
+            v.animate().scaleX(if (focused) 1.08f else 1.0f).scaleY(if (focused) 1.08f else 1.0f).setDuration(160).start()
+        }
+
+        findViewById<View>(R.id.closeSearchPanelBtn).setOnClickListener { closeSearchPanel() }
+        findViewById<View>(R.id.searchWebBtn).setOnClickListener { executeWebSearch(searchInput.text.toString()) }
+        findViewById<View>(R.id.searchYoutubeBtn).setOnClickListener { executeYoutubeSearch(searchInput.text.toString()) }
 
         homeQrCard = findViewById(R.id.homeQrCard)
         homeQrImageView = findViewById(R.id.homeQrImageView)
@@ -231,6 +253,146 @@ class MainActivity : Activity() {
             activeInstance = null
         }
         super.onDestroy()
+    }
+
+    // ---- Search Panel Methods ----
+    fun isSearchPanelOpen(): Boolean = searchPanel.visibility == View.VISIBLE
+
+    private fun openSearchPanel() {
+        searchPanel.visibility = View.VISIBLE
+        searchInput.requestFocus()
+        filterSearchApps(searchInput.text.toString())
+
+        searchInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                filterSearchApps(s?.toString() ?: "")
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+    }
+
+    private fun closeSearchPanel() {
+        searchPanel.visibility = View.GONE
+        searchInput.setText("")
+        searchPillBtn.requestFocus()
+    }
+
+    fun handleLiveTypeFromRemote(text: String, action: String) {
+        runOnUiThread {
+            if (action == "clear") {
+                searchInput.setText("")
+            } else {
+                searchInput.setText(text)
+                if (text.isNotEmpty()) searchInput.setSelection(text.length)
+            }
+
+            if (action == "enter") {
+                val query = searchInput.text.toString().trim()
+                val matches = allInstalledApps.filter { it.label.contains(query, ignoreCase = true) }
+                if (matches.isNotEmpty()) {
+                    launch(matches[0])
+                    closeSearchPanel()
+                } else {
+                    executeWebSearch(query)
+                }
+            }
+        }
+    }
+
+    private fun filterSearchApps(query: String) {
+        searchAppResults.removeAllViews()
+        val q = query.trim().lowercase(Locale.US)
+        val hiddenPkgs = getHiddenPkgs()
+        val matches = if (q.isEmpty()) emptyList() else allInstalledApps.filter {
+            !hiddenPkgs.contains(it.pkg) && it.label.lowercase(Locale.US).contains(q)
+        }.take(5)
+
+        val inflater = LayoutInflater.from(this)
+        for (app in matches) {
+            val item = inflater.inflate(R.layout.item_hidden_app, searchAppResults, false)
+            item.findViewById<TextView>(R.id.appName).text = app.label
+            val btn = item.findViewById<TextView>(R.id.unhideBtn)
+            btn.text = "Open"
+            btn.setOnClickListener {
+                launch(app)
+                closeSearchPanel()
+            }
+            btn.setOnFocusChangeListener { v, focused ->
+                v.animate().scaleX(if (focused) 1.08f else 1.0f).scaleY(if (focused) 1.08f else 1.0f).setDuration(160).start()
+            }
+            searchAppResults.addView(item)
+        }
+    }
+
+    private fun executeWebSearch(query: String) {
+        val q = query.trim()
+        if (q.isEmpty()) {
+            Toast.makeText(this, "Type search query first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            val intent = Intent(Intent.ACTION_WEB_SEARCH).apply {
+                putExtra(SearchManager.QUERY, q)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+        } catch (_: Exception) {
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=" + Uri.encode(q))).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(intent)
+            } catch (_: Exception) {
+                Toast.makeText(this, "Cannot open web browser", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun executeYoutubeSearch(query: String) {
+        val q = query.trim()
+        if (q.isEmpty()) {
+            Toast.makeText(this, "Type search query first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            val intent = Intent(Intent.ACTION_SEARCH).apply {
+                setPackage("com.google.android.youtube.tv")
+                putExtra(SearchManager.QUERY, q)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+        } catch (_: Exception) {
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/results?search_query=" + Uri.encode(q))).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(intent)
+            } catch (_: Exception) {
+                Toast.makeText(this, "Cannot search YouTube", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun triggerVoiceSearch(): String? {
+        val pm = packageManager
+        val intents = listOf(
+            Intent("android.speech.action.VOICE_SEARCH_HANDS_FREE"),
+            Intent("android.intent.action.VOICE_COMMAND"),
+            Intent(Intent.ACTION_ASSIST)
+        )
+        for (intent in intents) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            @Suppress("DEPRECATION")
+            val matches = pm.queryIntentActivities(intent, 0)
+            if (matches.isNotEmpty()) {
+                return try {
+                    startActivity(intent)
+                    null
+                } catch (_: Exception) { null }
+            }
+        }
+        return "Use the mic on your phone keyboard"
     }
 
     private fun refreshToolsRow() {
@@ -906,6 +1068,10 @@ class MainActivity : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (searchPanel.visibility == View.VISIBLE) {
+            closeSearchPanel()
+            return
+        }
         val hiddenPanel = findViewById<View>(R.id.hiddenAppsPanel)
         if (hiddenPanel.visibility == View.VISIBLE) {
             closeHiddenAppsPanel()

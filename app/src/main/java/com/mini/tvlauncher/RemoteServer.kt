@@ -21,7 +21,8 @@ interface RemoteHost {
     fun exchangeToken(token: String): String?
     fun isValidKey(key: String): Boolean
     fun adjustVolume(action: String): Boolean
-    fun typeText(text: String): Boolean
+    fun typeText(text: String, action: String): Boolean
+    fun triggerVoice(): String?
     fun getFavoritesJson(): String
     fun updateFavorite(pkg: String, pinned: Boolean): Boolean
     fun getHiddenJson(): String
@@ -179,7 +180,16 @@ class RemoteServer(private val pin: String, private val host: RemoteHost) {
                     }
                     "/type" -> {
                         val txt = q["text"] ?: q["t"] ?: ""
-                        reply(out, if (host.typeText(txt)) 200 else 400, "text/plain", ByteArray(0))
+                        val act = q["action"] ?: q["a"] ?: ""
+                        reply(out, if (host.typeText(txt, act)) 200 else 400, "text/plain", ByteArray(0))
+                    }
+                    "/voice" -> {
+                        val err = host.triggerVoice()
+                        if (err == null) {
+                            reply(out, 200, "text/plain", "ok".toByteArray())
+                        } else {
+                            reply(out, 400, "text/plain", err.toByteArray(Charsets.UTF_8))
+                        }
                     }
                     "/icon" -> {
                         val pkg = q["pkg"] ?: ""
