@@ -20,6 +20,8 @@ import android.net.NetworkRequest
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.*
 import android.view.animation.DecelerateInterpolator
@@ -85,6 +87,20 @@ class MainActivity : Activity() {
     private lateinit var favoritesLabel: TextView
     private lateinit var toolsRow: RecyclerView
 
+    private lateinit var homeQrCard: LinearLayout
+    private lateinit var homeQrImageView: ImageView
+    private lateinit var homeQrCaption: TextView
+    private lateinit var homeQrOfflineText: TextView
+    private var homeQrBitmap: Bitmap? = null
+
+    private val qrHandler = Handler(Looper.getMainLooper())
+    private val qrRefreshRunnable = object : Runnable {
+        override fun run() {
+            refreshHomeQrCode()
+            qrHandler.postDelayed(this, 90_000L) // Regenerate every 90 seconds
+        }
+    }
+
     private val prefs by lazy { getSharedPreferences("launcher", MODE_PRIVATE) }
     private val pkgReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, i: Intent?) = loadApps()
@@ -95,6 +111,8 @@ class MainActivity : Activity() {
             runOnUiThread { applySettings(); reloadAppsAndRefresh() }
         } else if (key == "preset" || key == "custom" || key == "wallpaper_version") {
             runOnUiThread { applyWallpaper() }
+        } else if (key == "home_qr_mode" || key == "paired_devices_json") {
+            runOnUiThread { updateHomeQrVisibility(); refreshToolsRow() }
         }
     }
 
@@ -103,8 +121,8 @@ class MainActivity : Activity() {
     private var currentQrBitmap: Bitmap? = null
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(network: Network) { updateNetworkStatus() }
-        override fun onLost(network: Network) { updateNetworkStatus() }
+        override fun onAvailable(network: Network) { updateNetworkStatus(); refreshHomeQrCode() }
+        override fun onLost(network: Network) { updateNetworkStatus(); refreshHomeQrCode() }
         override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) { updateNetworkStatus() }
     }
 
@@ -126,23 +144,19 @@ class MainActivity : Activity() {
         favoritesRow = findViewById(R.id.favoritesRow)
         favoritesLabel = findViewById(R.id.favoritesLabel)
 
+        homeQrCard = findViewById(R.id.homeQrCard)
+        homeQrImageView = findViewById(R.id.homeQrImageView)
+        homeQrCaption = findViewById(R.id.homeQrCaption)
+        homeQrOfflineText = findViewById(R.id.homeQrOfflineText)
+
+        homeQrCard.setOnClickListener { openPairingPanel() }
+        homeQrCard.setOnFocusChangeListener { v, focused ->
+            v.animate().scaleX(if (focused) 1.08f else 1.0f).scaleY(if (focused) 1.08f else 1.0f).setDuration(160).start()
+        }
+
         // Setup Tools Row
         toolsRow.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        val toolTiles = getAvailableToolTiles()
-        toolsRow.adapter = ToolsAdapter(toolTiles) { tile ->
-            when (tile.id) {
-                "hidden_apps" -> openHiddenAppsPanel()
-                "power" -> handlePowerClick()
-                else -> {
-                    try {
-                        tile.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        startActivity(tile.intent)
-                    } catch (_: Exception) {
-                        Toast.makeText(this, "Cannot open ${tile.label}", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-        }
+        refreshToolsRow()
 
         // Setup Favorites Row
         favoritesRow.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
@@ -153,12 +167,6 @@ class MainActivity : Activity() {
         grid.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         adapter = AppAdapter(grid, onAppClick = { launch(it) }, onAppLongClick = { entry, view -> showAppContextMenu(entry, view) })
         grid.adapter = adapter
-
-        val pairBtn = findViewById<View>(R.id.pairBtn)
-        pairBtn.setOnClickListener { openPairingPanel() }
-        pairBtn.setOnFocusChangeListener { v, focused ->
-            v.animate().scaleX(if (focused) 1.08f else 1.0f).scaleY(if (focused) 1.08f else 1.0f).setDuration(160).start()
-        }
 
         val wallpaperBtn = findViewById<View>(R.id.wallpaperBtn)
         wallpaperBtn.setOnClickListener { chooseWallpaper() }
@@ -216,10 +224,72 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         prefs.unregisterOnSharedPreferenceChangeListener(prefChangeListener)
+        qrHandler.removeCallbacks(qrRefreshRunnable)
+        homeQrBitmap?.recycle()
+        homeQrBitmap = null
         if (activeInstance?.get() == this) {
             activeInstance = null
         }
         super.onDestroy()
+    }
+
+    private fun refreshToolsRow() {
+        val toolTiles = getAvailableToolTiles()
+        toolsRow.adapter = ToolsAdapter(toolTiles) { tile ->
+            when (tile.id) {
+                "hidden_apps" -> openHiddenAppsPanel()
+                "power" -> handlePowerClick()
+                "pair_phone" -> openPairingPanel()
+                else -> {
+                    try {
+                        tile.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(tile.intent)
+                    } catch (_: Exception) {
+                        Toast.makeText(this, "Cannot open ${tile.label}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun refreshHomeQrCode() {
+        val token = generatePairingToken()
+        val ip = localIp()
+        val port = RemoteService.serverPort.takeIf { it != 0 } ?: 8080
+
+        updateHomeQrVisibility()
+
+        if (ip == null) {
+            homeQrImageView.visibility = View.GONE
+            homeQrCaption.visibility = View.GONE
+            homeQrOfflineText.visibility = View.VISIBLE
+        } else {
+            homeQrImageView.visibility = View.VISIBLE
+            homeQrCaption.visibility = View.VISIBLE
+            homeQrOfflineText.visibility = View.GONE
+
+            val url = "http://$ip:$port/?t=$token"
+            val newBmp = generateQrBitmap(url, 240)
+            if (newBmp != null) {
+                val oldBmp = homeQrBitmap
+                homeQrBitmap = newBmp
+                homeQrImageView.setImageBitmap(newBmp)
+                oldBmp?.recycle()
+            }
+        }
+    }
+
+    private fun updateHomeQrVisibility() {
+        val mode = prefs.getString("home_qr_mode", "always") ?: "always"
+        val hasPaired = getPairedDevicesList().isNotEmpty()
+
+        val isVisible = when (mode) {
+            "off" -> false
+            "until_paired" -> !hasPaired
+            else -> true
+        }
+
+        homeQrCard.visibility = if (isVisible) View.VISIBLE else View.GONE
     }
 
     fun reloadAppsAndRefresh() {
@@ -553,10 +623,17 @@ class MainActivity : Activity() {
         // 5. Display
         checkAndAdd("display", "Display", R.drawable.ic_tool_display, Intent(Settings.ACTION_DISPLAY_SETTINGS))
 
-        // 6. Hidden Apps
+        // 6. Pair Phone (If Home QR tile is hidden)
+        val mode = prefs.getString("home_qr_mode", "always") ?: "always"
+        val hasPaired = getPairedDevicesList().isNotEmpty()
+        if (mode == "off" || (mode == "until_paired" && hasPaired)) {
+            result.add(ToolTile("pair_phone", "Pair Phone", R.drawable.ic_tool_wifi, Intent()))
+        }
+
+        // 7. Hidden Apps
         result.add(ToolTile("hidden_apps", "Hidden Apps", R.drawable.ic_tool_hidden, Intent()))
 
-        // 7. Original Launcher (Fallback to Settings > Apps)
+        // 8. Original Launcher (Fallback to Settings > Apps)
         val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         @Suppress("DEPRECATION")
         val homeMatches = pm.queryIntentActivities(homeIntent, 0)
@@ -652,7 +729,7 @@ class MainActivity : Activity() {
         currentQrBitmap = null
         findViewById<ImageView>(R.id.qrImageView).setImageBitmap(null)
         findViewById<View>(R.id.pairingPanel).visibility = View.GONE
-        findViewById<View>(R.id.pairBtn).requestFocus()
+        refreshHomeQrCode()
     }
 
     private fun generatePairingToken(): String {
@@ -671,6 +748,7 @@ class MainActivity : Activity() {
             val hash = hashKey(deviceKey)
             val name = "Phone (" + SimpleDateFormat("MMM d, HH:mm", Locale.US).format(Date()) + ")"
             addPairedDevice(hash, name)
+            runOnUiThread { refreshHomeQrCode() }
             return deviceKey
         }
         return null
@@ -699,7 +777,11 @@ class MainActivity : Activity() {
         val arr = JSONArray()
         list.forEach { arr.put(it) }
         prefs.edit().putString("paired_devices_json", arr.toString()).apply()
-        runOnUiThread { refreshPairedDevicesUi() }
+        runOnUiThread {
+            refreshPairedDevicesUi()
+            updateHomeQrVisibility()
+            refreshToolsRow()
+        }
     }
 
     private fun addPairedDevice(hash: String, name: String) {
@@ -802,9 +884,13 @@ class MainActivity : Activity() {
             addAction(Intent.ACTION_PACKAGE_REPLACED); addDataScheme("package")
         }
         registerReceiver(pkgReceiver, f)
+
+        qrHandler.removeCallbacks(qrRefreshRunnable)
+        qrHandler.post(qrRefreshRunnable)
     }
 
     override fun onStop() {
+        qrHandler.removeCallbacks(qrRefreshRunnable)
         if (activeInstance?.get() == this) {
             activeInstance = null
         }

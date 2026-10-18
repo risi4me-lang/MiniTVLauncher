@@ -159,6 +159,14 @@ body { background: #0b0f1a; color: #fff; user-select: none; -webkit-user-select:
           <option value="most_used">Most Used</option>
         </select>
       </div>
+      <div style="margin-top:12px">
+        <label class="section-title">Home QR Code</label>
+        <select id="homeQrMode" class="select-field">
+          <option value="always">Always Show</option>
+          <option value="until_paired">Until a phone is paired</option>
+          <option value="off">Off</option>
+        </select>
+      </div>
       <button onclick="saveSettings()" class="btn">Save Settings</button>
       <button onclick="resetUsageStats()" class="btn btn-secondary">Reset Usage Stats</button>
     </div>
@@ -320,7 +328,15 @@ function sendKeyRequest(kName) {
       handleAuthError();
     } else {
       handleConnFailure();
-      showToast('D-pad only works on launcher screen', true);
+      r.text().then(errCode => {
+        if (errCode === 'accessibility_off') {
+          showToast('Enable Accessibility Service on TV for controls outside launcher', true);
+        } else if (errCode === 'no_focusable_node' || errCode === 'no_window') {
+          showToast('No focusable item found on screen', true);
+        } else {
+          showToast('Key action failed', true);
+        }
+      }).catch(() => showToast('Key action failed', true));
     }
   }).catch(() => handleConnFailure());
 }
@@ -701,6 +717,7 @@ function loadSettings() {
     document.getElementById('showSeconds').checked = !!s.showSeconds;
     document.getElementById('showDate').checked = !!s.showDate;
     document.getElementById('sortMode').value = s.sortMode || 'alphabetical';
+    document.getElementById('homeQrMode').value = s.homeQrMode || 'always';
     updateAccDots(s.accessibilityEnabled !== false);
   }).catch(() => {});
 }
@@ -711,7 +728,8 @@ function saveSettings() {
     is12h: document.getElementById('is12h').value === 'true',
     showSeconds: document.getElementById('showSeconds').checked,
     showDate: document.getElementById('showDate').checked,
-    sortMode: document.getElementById('sortMode').value
+    sortMode: document.getElementById('sortMode').value,
+    homeQrMode: document.getElementById('homeQrMode').value
   };
   api('/settings', {
     method: 'POST',
