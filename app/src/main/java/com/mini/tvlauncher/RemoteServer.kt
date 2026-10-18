@@ -59,13 +59,20 @@ class RemoteServer(private val pin: String, private val host: RemoteHost) {
         pool.shutdownNow()
     }
 
-    private fun readLine(i: BufferedInputStream): String? {
+    private fun readLine(i: BufferedInputStream, maxLen: Int = 4096): String? {
         val sb = StringBuilder()
         while (true) {
-            val c = i.read()
+            val c = try {
+                i.read()
+            } catch (_: java.net.SocketTimeoutException) {
+                return null
+            } catch (_: IOException) {
+                return null
+            }
             if (c == -1) return if (sb.isEmpty()) null else sb.toString()
             if (c == '\n'.code) return sb.toString().trimEnd('\r')
             sb.append(c.toChar())
+            if (sb.length > maxLen) return null
         }
     }
 
@@ -87,17 +94,20 @@ class RemoteServer(private val pin: String, private val host: RemoteHost) {
                 s.soTimeout = 8000
                 val inp = BufferedInputStream(s.getInputStream())
                 val out = s.getOutputStream()
-                val reqLine = readLine(inp) ?: return
+                val reqLine = readLine(inp, 4096) ?: return
                 val parts = reqLine.split(" ")
                 if (parts.size < 2) return
                 val method = parts[0].uppercase()
                 val target = parts[1]
                 var len = 0
                 var reqHeaderKey: String? = null
+                var headerCount = 0
 
                 while (true) {
-                    val h = readLine(inp) ?: break
+                    val h = readLine(inp, 4096) ?: return
                     if (h.isEmpty()) break
+                    headerCount++
+                    if (headerCount > 50) return
                     if (h.startsWith("content-length:", true))
                         len = h.substringAfter(":").trim().toIntOrNull() ?: 0
                     if (h.startsWith("x-device-key:", true))
@@ -110,13 +120,20 @@ class RemoteServer(private val pin: String, private val host: RemoteHost) {
                     val t = q["t"]
                     if (!t.isNullOrEmpty()) {
                         val newKey = host.exchangeToken(t)
-                        val html = String(host.pageHtml(), Charsets.UTF_8)
-                        val injected = if (newKey != null) {
-                            "<script>window.PAIRED_KEY=\"$newKey\";</script>$html"
+                        if (newKey != null) {
+                            val html = String(host.pageHtml(), Charsets.UTF_8)
+                            val injected = "<script>window.PAIRED_KEY=${JSONObject.quote(newKey)};</script>$html"
+                            reply(out, 200, "text/html; charset=utf-8", injected.toByteArray(Charsets.UTF_8))
                         } else {
-                            "<script>alert('Pairing token invalid or expired.');</script>$html"
+                            val expiredHtml = "<!DOCTYPE html><html><head><meta charset=\"utf-8\">" +
+                                "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" +
+                                "<title>Pairing Expired</title>" +
+                                "<style>body{margin:0;background:#0b0f1a;color:#fff;font-family:sans-serif;padding:24px;text-align:center}" +
+                                ".box{background:#131b2e;padding:24px;border-radius:16px;max-width:400px;margin:40px auto;line-height:1.5}</style></head>" +
+                                "<body><div class=\"box\"><h3>Pairing Expired</h3>" +
+                                "<p>Open <b>Pair Phone</b> on the TV and scan the new QR code.</p></div></body></html>"
+                            reply(out, 200, "text/html; charset=utf-8", expiredHtml.toByteArray(Charsets.UTF_8))
                         }
-                        reply(out, 200, "text/html; charset=utf-8", injected.toByteArray(Charsets.UTF_8))
                         return
                     }
                     reply(out, 200, "text/html; charset=utf-8", host.pageHtml())

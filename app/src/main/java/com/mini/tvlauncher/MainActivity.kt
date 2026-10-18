@@ -18,6 +18,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.*
@@ -92,7 +93,7 @@ class MainActivity : Activity() {
     private val prefChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == "user_name" || key == "clock_is_12h" || key == "clock_show_seconds" || key == "clock_show_date" || key == "favorite_pkgs_json" || key == "hidden_pkgs_json" || key == "app_rename_map" || key == "app_launch_counts" || key == "app_sort_mode") {
             runOnUiThread { applySettings(); reloadAppsAndRefresh() }
-        } else if (key == "preset" || key == "custom") {
+        } else if (key == "preset" || key == "custom" || key == "wallpaper_version") {
             runOnUiThread { applyWallpaper() }
         }
     }
@@ -197,6 +198,20 @@ class MainActivity : Activity() {
         applyWallpaper()
         loadApps()
         startRemoteService()
+        requestNotificationPermissionIfNeeded()
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                if (!prefs.getBoolean("notification_perm_requested", false)) {
+                    prefs.edit().putBoolean("notification_perm_requested", true).apply()
+                    try {
+                        requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 101)
+                    } catch (_: Exception) {}
+                }
+            }
+        }
     }
 
     override fun onDestroy() {
@@ -934,7 +949,7 @@ class MainActivity : Activity() {
                                 averageColor = candidate.averageColor
                             )
                         )
-                        break // Resolve first valid target and move to next candidate!
+                        break
                     }
                 }
             }
@@ -1030,7 +1045,7 @@ class MainActivity : Activity() {
         AlertDialog.Builder(this).setTitle("Wallpaper")
             .setItems(names.toTypedArray()) { _, which ->
                 if (which < presets.size) {
-                    prefs.edit().putInt("preset", which).putBoolean("custom", false).apply()
+                    prefs.edit().putInt("preset", which).putBoolean("custom", false).putLong("wallpaper_version", System.currentTimeMillis()).apply()
                     applyWallpaper()
                 } else pickImage()
             }.show()
@@ -1059,7 +1074,7 @@ class MainActivity : Activity() {
                 bmp.compress(Bitmap.CompressFormat.JPEG, 90, it)
             }
             bmp.recycle()
-            prefs.edit().putBoolean("custom", true).apply()
+            prefs.edit().putBoolean("custom", true).putLong("wallpaper_version", System.currentTimeMillis()).apply()
             runOnUiThread { applyWallpaper() }
             true
         } catch (_: Exception) { false }

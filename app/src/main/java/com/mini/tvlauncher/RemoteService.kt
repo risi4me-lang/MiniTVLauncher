@@ -280,7 +280,7 @@ class RemoteService : Service(), RemoteHost {
                 bmp.compress(Bitmap.CompressFormat.JPEG, 90, it)
             }
             bmp.recycle()
-            prefs.edit().putBoolean("custom", true).apply()
+            prefs.edit().putBoolean("custom", true).putLong("wallpaper_version", System.currentTimeMillis()).apply()
             true
         } catch (_: Exception) { false }
     }
