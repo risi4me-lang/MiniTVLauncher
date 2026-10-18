@@ -135,45 +135,64 @@ class RemoteService : Service(), RemoteHost {
         return AppUtils.processAppList(list, prefs, filesDir)
     }
 
-    override fun sendKey(name: String): Boolean {
-        val acc = RemoteAccessibilityService.instance
+    override fun sendKey(name: String): String? {
         val keyName = name.lowercase(Locale.US)
+        val acc = RemoteAccessibilityService.instance
 
         if (keyName == "back") {
-            return acc?.performBack() ?: false
+            if (acc == null) return "accessibility_off"
+            return if (acc.performBack()) null else "back_failed"
         }
         if (keyName == "home") {
             return if (acc != null) {
-                acc.performHome()
+                if (acc.performHome()) null else "home_failed"
             } else {
                 try {
                     val intent = Intent(Intent.ACTION_MAIN)
                         .addCategory(Intent.CATEGORY_HOME)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     startActivity(intent)
-                    true
-                } catch (_: Exception) { false }
+                    null
+                } catch (_: Exception) { "home_failed" }
             }
         }
 
-        // Route D-pad keys (up, down, left, right, ok) to MainActivity via WeakReference
-        val mainActivity = MainActivity.activeInstance?.get() ?: return false
+        // Route D-pad keys (up, down, left, right, ok) to MainActivity via WeakReference if in foreground
+        val mainActivity = MainActivity.activeInstance?.get()
+        if (mainActivity != null) {
+            val code = when (keyName) {
+                "up" -> KeyEvent.KEYCODE_DPAD_UP
+                "down" -> KeyEvent.KEYCODE_DPAD_DOWN
+                "left" -> KeyEvent.KEYCODE_DPAD_LEFT
+                "right" -> KeyEvent.KEYCODE_DPAD_RIGHT
+                "ok" -> KeyEvent.KEYCODE_DPAD_CENTER
+                else -> return "invalid_key"
+            }
 
-        val code = when (keyName) {
-            "up" -> KeyEvent.KEYCODE_DPAD_UP
-            "down" -> KeyEvent.KEYCODE_DPAD_DOWN
-            "left" -> KeyEvent.KEYCODE_DPAD_LEFT
-            "right" -> KeyEvent.KEYCODE_DPAD_RIGHT
-            "ok" -> KeyEvent.KEYCODE_DPAD_CENTER
-            else -> return false
+            mainActivity.runOnUiThread {
+                val t = SystemClock.uptimeMillis()
+                mainActivity.dispatchKeyEvent(KeyEvent(t, t, KeyEvent.ACTION_DOWN, code, 0))
+                mainActivity.dispatchKeyEvent(KeyEvent(t, t, KeyEvent.ACTION_UP, code, 0))
+            }
+            return null
         }
 
-        mainActivity.runOnUiThread {
-            val t = SystemClock.uptimeMillis()
-            mainActivity.dispatchKeyEvent(KeyEvent(t, t, KeyEvent.ACTION_DOWN, code, 0))
-            mainActivity.dispatchKeyEvent(KeyEvent(t, t, KeyEvent.ACTION_UP, code, 0))
+        // Outside launcher: require Accessibility Service
+        if (acc == null) {
+            return "accessibility_off"
         }
-        return true
+
+        return when (keyName) {
+            "up", "down", "left", "right" -> {
+                val (ok, err) = acc.navigate(keyName)
+                if (ok) null else (err ?: "no_focusable_node")
+            }
+            "ok" -> {
+                val (ok, err) = acc.select()
+                if (ok) null else (err ?: "no_focusable_node")
+            }
+            else -> "invalid_key"
+        }
     }
 
     override fun typeText(text: String): Boolean {

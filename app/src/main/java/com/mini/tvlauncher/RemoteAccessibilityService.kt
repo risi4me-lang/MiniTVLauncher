@@ -1,10 +1,15 @@
 package com.mini.tvlauncher
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
 import android.content.Context
 import android.content.Intent
+import android.graphics.Path
+import android.graphics.Rect
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.View
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
@@ -55,6 +60,107 @@ class RemoteAccessibilityService : AccessibilityService() {
         return performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
     }
 
+    fun navigate(direction: String): Pair<Boolean, String?> {
+        val root = rootInActiveWindow ?: return Pair(false, "no_window")
+
+        var currentFocus = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        if (currentFocus == null) {
+            currentFocus = root.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
+        }
+        if (currentFocus == null) {
+            currentFocus = findFirstFocusableNode(root)
+        }
+
+        val viewFocusDir = when (direction.lowercase()) {
+            "up" -> View.FOCUS_UP
+            "down" -> View.FOCUS_DOWN
+            "left" -> View.FOCUS_LEFT
+            "right" -> View.FOCUS_RIGHT
+            else -> {
+                currentFocus?.recycle()
+                root.recycle()
+                return Pair(false, "invalid_direction")
+            }
+        }
+
+        if (currentFocus != null) {
+            val nextNode = currentFocus.focusSearch(viewFocusDir)
+            if (nextNode != null) {
+                val ok = nextNode.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                nextNode.recycle()
+                currentFocus.recycle()
+                root.recycle()
+                if (ok) return Pair(true, null)
+            }
+        }
+
+        val scrollAction = if (direction == "down" || direction == "right") {
+            AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
+        } else {
+            AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
+        }
+
+        val targetForScroll = currentFocus ?: root
+        val scrolled = scrollNearestScrollable(targetForScroll, scrollAction)
+
+        currentFocus?.recycle()
+        root.recycle()
+
+        return if (scrolled) {
+            Pair(true, null)
+        } else {
+            Pair(false, "no_focusable_node")
+        }
+    }
+
+    fun select(): Pair<Boolean, String?> {
+        val root = rootInActiveWindow ?: return Pair(false, "no_window")
+
+        var currentFocus = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        if (currentFocus == null) {
+            currentFocus = root.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
+        }
+        if (currentFocus == null) {
+            currentFocus = findFirstFocusableNode(root)
+        }
+
+        if (currentFocus == null) {
+            root.recycle()
+            return Pair(false, "no_focusable_node")
+        }
+
+        val clickableNode = findNearestClickableAncestor(currentFocus)
+        if (clickableNode != null) {
+            val ok = clickableNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            clickableNode.recycle()
+            currentFocus.recycle()
+            root.recycle()
+            if (ok) return Pair(true, null)
+        }
+
+        val rect = Rect()
+        currentFocus.getBoundsInScreen(rect)
+        val cx = rect.exactCenterX()
+        val cy = rect.exactCenterY()
+
+        var gestureOk = false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && cx > 0 && cy > 0) {
+            val path = Path().apply { moveTo(cx, cy) }
+            val stroke = GestureDescription.StrokeDescription(path, 0, 50)
+            val gesture = GestureDescription.Builder().addStroke(stroke).build()
+            gestureOk = dispatchGesture(gesture, null, null)
+        }
+
+        currentFocus.recycle()
+        root.recycle()
+
+        return if (gestureOk) {
+            Pair(true, null)
+        } else {
+            Pair(false, "no_focusable_node")
+        }
+    }
+
     fun typeText(text: String): Boolean {
         val root = rootInActiveWindow ?: return false
         val focusedNode = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
@@ -73,16 +179,57 @@ class RemoteAccessibilityService : AccessibilityService() {
         return false
     }
 
+    private fun findFirstFocusableNode(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
+        if (node == null) return null
+        if (node.isFocusable && node.isVisibleToUser) {
+            return AccessibilityNodeInfo.obtain(node)
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val res = findFirstFocusableNode(child)
+            child.recycle()
+            if (res != null) return res
+        }
+        return null
+    }
+
+    private fun findNearestClickableAncestor(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
+        var current: AccessibilityNodeInfo? = AccessibilityNodeInfo.obtain(node)
+        while (current != null) {
+            if (current.isClickable) return current
+            val parent = current.parent
+            current.recycle()
+            current = parent
+        }
+        return null
+    }
+
+    private fun scrollNearestScrollable(startNode: AccessibilityNodeInfo, action: Int): Boolean {
+        var current: AccessibilityNodeInfo? = AccessibilityNodeInfo.obtain(startNode)
+        while (current != null) {
+            if (current.isScrollable) {
+                val ok = current.performAction(action)
+                current.recycle()
+                if (ok) return true
+                return false
+            }
+            val parent = current.parent
+            current.recycle()
+            current = parent
+        }
+        return false
+    }
+
     private fun findFocusedEditText(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
         if (node == null) return null
         if (node.isFocused && (node.isEditable || node.className?.toString()?.contains("EditText", true) == true)) {
-            return node
+            return AccessibilityNodeInfo.obtain(node)
         }
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
             val res = findFocusedEditText(child)
-            if (res != null) return res
             child.recycle()
+            if (res != null) return res
         }
         return null
     }

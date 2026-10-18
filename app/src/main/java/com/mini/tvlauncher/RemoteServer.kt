@@ -12,7 +12,7 @@ import java.util.concurrent.Executors
 
 interface RemoteHost {
     fun apps(): List<AppEntry>
-    fun sendKey(name: String): Boolean
+    fun sendKey(name: String): String?
     fun launchPkg(pkg: String): Boolean
     fun saveWallpaper(bytes: ByteArray): Boolean
     fun pageHtml(): ByteArray
@@ -164,7 +164,14 @@ class RemoteServer(private val pin: String, private val host: RemoteHost) {
                         }
                         reply(out, 200, "application/json", arr.toString().toByteArray())
                     }
-                    "/key" -> reply(out, if (host.sendKey(q["k"] ?: "")) 200 else 400, "text/plain", ByteArray(0))
+                    "/key" -> {
+                        val err = host.sendKey(q["k"] ?: "")
+                        if (err == null) {
+                            reply(out, 200, "text/plain", "ok".toByteArray())
+                        } else {
+                            reply(out, 400, "text/plain", err.toByteArray(Charsets.UTF_8))
+                        }
+                    }
                     "/volume" -> {
                         val act = q["action"] ?: q["a"] ?: q["v"] ?: ""
                         reply(out, if (host.adjustVolume(act)) 200 else 400, "text/plain", ByteArray(0))
