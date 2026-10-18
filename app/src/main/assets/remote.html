@@ -1,0 +1,674 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mini Launcher Remote</title>
+<style>
+body{margin:0;background:#0b0f1a;color:#fff;font-family:sans-serif;padding:16px;user-select:none;-webkit-user-select:none}
+h3{margin:18px 0 8px;color:#9ab}
+button,input,select{font-size:18px;border-radius:12px;border:0;background:#1b2440;color:#fff;padding:14px;touch-action:none;user-select:none;-webkit-user-select:none}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:300px;margin:auto}
+.pad button{height:60px;touch-action:none;user-select:none;-webkit-user-select:none}.ok{background:#2f5bff}
+.swipe-pad{
+  max-width:300px;
+  height:130px;
+  margin:14px auto 0;
+  background:#131b2e;
+  border:2px dashed #2f5bff;
+  border-radius:16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#9ab;
+  font-size:16px;
+  font-weight:bold;
+  touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
+  cursor:pointer;
+}
+.app-row{display:flex;align-items:center;justify-content:space-between;background:#131b2e;padding:10px 14px;border-radius:12px;margin:6px 0}
+.app-row span{flex:1;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:8px;user-select:text;-webkit-user-select:text}
+.app-row button{font-size:14px;padding:8px 12px;margin-left:6px;touch-action:auto}
+.app-card-editor{background:#131b2e;border-radius:12px;padding:12px;margin:8px 0}
+.app-card-title{font-size:16px;font-weight:bold;margin-bottom:8px;display:flex;justify-content:space-between}
+.app-card-sub{font-size:12px;color:#9ab;font-weight:normal}
+.editor-controls{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.editor-row{display:flex;gap:8px;align-items:center}
+input[type=text],input[type=password],select{width:100%;box-sizing:border-box;touch-action:auto;user-select:text;-webkit-user-select:text}
+.box{background:#131b2e;padding:16px;border-radius:12px;margin-top:8px}
+.row{margin-bottom:12px}
+.lbl{display:block;margin-bottom:4px;color:#9ab;font-size:14px}
+.check-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.check-row input{width:24px;height:24px;accent-color:#2f5bff}
+.btn-sm{font-size:13px;padding:6px 12px;border-radius:8px}
+.btn-danger{background:#8e2a2a}
+</style></head><body>
+<div id="login"><h3>Enter PIN shown on TV</h3>
+<input id="pin" type="password" inputmode="numeric" placeholder="PIN">
+<button onclick="go()" style="margin-top:10px;width:100%">Connect</button></div>
+
+<div id="main" style="display:none">
+
+<div id="connError" style="display:none;background:#8e2a2a;color:#fff;padding:10px;text-align:center;font-size:14px;margin-bottom:12px;border-radius:12px;font-weight:bold">
+  ⚠️ TV not reachable
+</div>
+
+<div id="accNote" style="display:none;background:#3d1a1a;color:#ffadad;padding:12px;border-radius:12px;margin-bottom:16px;font-size:14px;line-height:1.4">
+  ⚠️ <b>Note:</b> Accessibility Service is disabled on TV. Enable <i>Mini Launcher Remote Service</i> in TV Settings &rarr; Accessibility for global Back/Home, Power, and text typing in other apps.
+</div>
+
+<!-- D-pad Navigation Pad -->
+<div class="pad" oncontextmenu="return false;">
+  <span></span><button id="btnUp">&#9650;</button><span></span>
+  <button id="btnLeft">&#9664;</button><button id="btnOk" class="ok">OK</button><button id="btnRight">&#9654;</button>
+  <span></span><button id="btnDown">&#9660;</button><span></span>
+</div>
+
+<!-- Swipe Pad -->
+<div id="swipeArea" class="swipe-pad" oncontextmenu="return false;">
+  👆 Swipe / Tap
+</div>
+
+<!-- Global Navigation: Back, Home, Power -->
+<div class="pad" style="margin-top:12px" oncontextmenu="return false;">
+  <button id="btnBack" style="background:#253050">&#8617; Back</button>
+  <button id="btnHome" style="background:#2f3b60">&#8962; Home</button>
+  <button id="btnPower" style="background:#8e2a2a">&#9889; Power</button>
+</div>
+
+<!-- Volume Controls -->
+<div class="pad" style="margin-top:10px" oncontextmenu="return false;">
+  <button id="btnVolDown">&#128067; Vol -</button>
+  <button id="btnVolMute" style="background:#2f3b60">&#128069; Mute</button>
+  <button id="btnVolUp">&#128266; Vol +</button>
+</div>
+
+<!-- Send Link to TV -->
+<h3>Send Link to TV</h3>
+<div class="box" style="display:flex;gap:8px">
+  <input type="text" id="linkInput" placeholder="https://youtube.com/watch?v=..." style="flex:1">
+  <button onclick="sendLink()" style="background:#2f5bff">Send Link</button>
+</div>
+
+<!-- Text Typing Input -->
+<h3>Type Text to TV</h3>
+<div class="box" style="display:flex;gap:8px">
+  <input type="text" id="typeInput" placeholder="Type message or text" style="flex:1">
+  <button onclick="sendText()" style="background:#2f5bff">Send Text</button>
+</div>
+
+<!-- Favorites Section -->
+<h3>Favorites</h3>
+<div id="favList" class="box" style="padding:8px"></div>
+
+<!-- Hidden Apps Section -->
+<h3>Hidden Apps</h3>
+<div id="hiddenList" class="box" style="padding:8px"></div>
+
+<!-- Settings Section -->
+<h3>Settings</h3>
+<div class="box">
+  <div class="row">
+    <span class="lbl">Your Name</span>
+    <input type="text" id="userName" placeholder="Enter name">
+  </div>
+  <div class="row">
+    <span class="lbl">Clock Format</span>
+    <select id="is12h">
+      <option value="true">12-hour (1:30 PM)</option>
+      <option value="false">24-hour (13:30)</option>
+    </select>
+  </div>
+  <div class="check-row">
+    <span>Show Seconds</span>
+    <input type="checkbox" id="showSeconds">
+  </div>
+  <div class="check-row">
+    <span>Show Date</span>
+    <input type="checkbox" id="showDate">
+  </div>
+  <div class="row">
+    <span class="lbl">Sort Apps By</span>
+    <select id="sortMode">
+      <option value="alphabetical">A-Z (Alphabetical)</option>
+      <option value="most_used">Most Used</option>
+    </select>
+  </div>
+  <button onclick="saveSettings()" style="width:100%;background:#2f5bff;margin-top:8px">Save Settings</button>
+  <button onclick="resetUsageStats()" style="width:100%;background:#3b4252;margin-top:8px">Reset Usage Stats</button>
+</div>
+
+<h3>Wallpaper</h3>
+<input type="file" accept="image/*" id="wp" onchange="up()">
+
+<h3>App Editor (Rename & Restyle)</h3>
+<div id="appEditorList"></div>
+
+<h3>All Apps</h3>
+<input type="text" id="q" placeholder="Search apps" oninput="render()">
+<div id="apps" style="margin-top:8px"></div></div>
+
+<script>
+let KEY = localStorage.getItem('device_key') || '';
+let PIN = sessionStorage.getItem('pin') || '';
+let APPS = [], FAVS = [], HIDDEN = [];
+
+let keyQueue = [];
+let consecutiveFailures = 0;
+
+if (window.PAIRED_KEY) {
+  KEY = window.PAIRED_KEY;
+  localStorage.setItem('device_key', KEY);
+}
+
+if (KEY || PIN) {
+  start();
+}
+
+function go() {
+  PIN = document.getElementById('pin').value;
+  start();
+}
+
+// Queue and Throttle Key Requests (~12 per second / 83ms interval)
+function queueKey(kName) {
+  if (keyQueue.length >= 5) {
+    keyQueue.splice(0, keyQueue.length - 4);
+  }
+  keyQueue.push(kName);
+}
+
+setInterval(() => {
+  if (keyQueue.length > 0) {
+    const k = keyQueue.shift();
+    sendKeyRequest(k);
+  }
+}, 83);
+
+function sendKeyRequest(kName) {
+  const auth = 'key=' + encodeURIComponent(KEY) + '&pin=' + encodeURIComponent(PIN);
+  const url = '/key?k=' + encodeURIComponent(kName) + '&' + auth;
+  fetch(url, { method: 'POST' }).then(r => {
+    if (r.ok) {
+      consecutiveFailures = 0;
+      document.getElementById('connError').style.display = 'none';
+    } else if (r.status === 401) {
+      handleAuthError();
+    } else {
+      handleConnFailure();
+    }
+  }).catch(() => {
+    handleConnFailure();
+  });
+}
+
+function handleConnFailure() {
+  consecutiveFailures++;
+  if (consecutiveFailures >= 3) {
+    document.getElementById('connError').style.display = 'block';
+  }
+}
+
+function handleAuthError() {
+  if (KEY) {
+    localStorage.removeItem('device_key');
+    KEY = '';
+  }
+  sessionStorage.removeItem('pin');
+  PIN = '';
+  main.style.display = 'none';
+  login.style.display = 'block';
+}
+
+function api(p, o) {
+  const auth = 'key=' + encodeURIComponent(KEY) + '&pin=' + encodeURIComponent(PIN);
+  const url = p + (p.includes('?') ? '&' : '?') + auth;
+  return fetch(url, o).then(r => {
+    if (r.status === 401) {
+      handleAuthError();
+      throw new Error('Unauthorized');
+    } else {
+      consecutiveFailures = 0;
+      document.getElementById('connError').style.display = 'none';
+    }
+    return r;
+  }).catch(e => {
+    if (e.message !== 'Unauthorized') handleConnFailure();
+    throw e;
+  });
+}
+
+function start() {
+  api('/apps').then(r => {
+    if (!r.ok) throw 0;
+    return r.json();
+  }).then(a => {
+    if (PIN) sessionStorage.setItem('pin', PIN);
+    APPS = a;
+    login.style.display = 'none';
+    main.style.display = 'block';
+    loadFavorites();
+    loadHidden();
+    render();
+    renderAppEditor();
+    loadSettings();
+  }).catch(e => {
+    if (e.message !== 'Unauthorized') {
+      sessionStorage.removeItem('pin');
+      alert('Wrong PIN or Invalid Key');
+    }
+  });
+}
+
+// Hold-to-Repeat Binding for Arrow Buttons
+function bindHoldRepeat(element, keyName) {
+  let holdTimer = null;
+  let repeatInterval = null;
+
+  function stopRepeat() {
+    if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+    if (repeatInterval) { clearInterval(repeatInterval); repeatInterval = null; }
+  }
+
+  element.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    stopRepeat();
+    queueKey(keyName);
+    if (navigator.vibrate) navigator.vibrate(15);
+
+    holdTimer = setTimeout(() => {
+      repeatInterval = setInterval(() => {
+        queueKey(keyName);
+        if (navigator.vibrate) navigator.vibrate(10);
+      }, 120);
+    }, 400);
+  });
+
+  element.addEventListener('pointerup', stopRepeat);
+  element.addEventListener('pointercancel', stopRepeat);
+  element.addEventListener('pointerleave', stopRepeat);
+}
+
+bindHoldRepeat(document.getElementById('btnUp'), 'up');
+bindHoldRepeat(document.getElementById('btnDown'), 'down');
+bindHoldRepeat(document.getElementById('btnLeft'), 'left');
+bindHoldRepeat(document.getElementById('btnRight'), 'right');
+bindHoldRepeat(document.getElementById('btnOk'), 'ok');
+bindHoldRepeat(document.getElementById('btnBack'), 'back');
+bindHoldRepeat(document.getElementById('btnHome'), 'home');
+
+// Swipe Pad Pointer Handling
+const swipeArea = document.getElementById('swipeArea');
+let startX = 0, startY = 0, startTime = 0;
+let lastStepX = 0, lastStepY = 0;
+let hasMoved = false;
+
+swipeArea.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  if (swipeArea.setPointerCapture) {
+    try { swipeArea.setPointerCapture(e.pointerId); } catch (_) {}
+  }
+  startX = e.clientX;
+  startY = e.clientY;
+  lastStepX = startX;
+  lastStepY = startY;
+  startTime = Date.now();
+  hasMoved = false;
+});
+
+swipeArea.addEventListener('pointermove', (e) => {
+  if (!startTime) return;
+  e.preventDefault();
+
+  const dx = e.clientX - lastStepX;
+  const dy = e.clientY - lastStepY;
+
+  if (Math.abs(dx) >= 45 || Math.abs(dy) >= 45) {
+    let dir = '';
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      dir = dx > 0 ? 'right' : 'left';
+      lastStepX += (dx > 0 ? 45 : -45);
+    } else {
+      dir = dy > 0 ? 'down' : 'up';
+      lastStepY += (dy > 0 ? 45 : -45);
+    }
+    queueKey(dir);
+    hasMoved = true;
+    if (navigator.vibrate) navigator.vibrate(10);
+  }
+});
+
+function endSwipe(e) {
+  if (!startTime) return;
+  const totalDx = Math.abs(e.clientX - startX);
+  const totalDy = Math.abs(e.clientY - startY);
+  const dt = Date.now() - startTime;
+
+  if (dt < 250 && totalDx < 15 && totalDy < 15 && !hasMoved) {
+    queueKey('ok');
+    if (navigator.vibrate) navigator.vibrate(15);
+  }
+  startTime = 0;
+}
+
+swipeArea.addEventListener('pointerup', endSwipe);
+swipeArea.addEventListener('pointercancel', endSwipe);
+
+// Volume & Power Buttons
+function bindVol(element, action) {
+  element.addEventListener('click', (e) => {
+    e.preventDefault();
+    api('/volume?action=' + action, { method: 'POST' });
+    if (navigator.vibrate) navigator.vibrate(15);
+  });
+}
+bindVol(document.getElementById('btnVolUp'), 'up');
+bindVol(document.getElementById('btnVolDown'), 'down');
+bindVol(document.getElementById('btnVolMute'), 'mute');
+
+function sendPower() {
+  api('/power', { method: 'POST' }).then(r => {
+    if (!r.ok) {
+      r.text().then(msg => {
+        alert(msg || 'Power menu not supported on this device');
+      }).catch(() => alert('Power menu not supported on this device'));
+    }
+  }).catch(() => alert('Power menu not supported on this device'));
+  if (navigator.vibrate) navigator.vibrate(15);
+}
+document.getElementById('btnPower').addEventListener('click', sendPower);
+
+function sendLink() {
+  const url = document.getElementById('linkInput').value.trim();
+  if (!url) return;
+  if (!url.toLowerCase().startsWith('http://') && !url.toLowerCase().startsWith('https://')) {
+    alert('Only http and https links are supported');
+    return;
+  }
+  if (url.length > 2000) {
+    alert('Link is too long (max 2000 characters)');
+    return;
+  }
+  api('/openlink?url=' + encodeURIComponent(url), { method: 'POST' }).then(r => {
+    if (r.ok) {
+      document.getElementById('linkInput').value = '';
+      alert('Link opened on TV');
+    } else {
+      r.text().then(msg => {
+        alert(msg || 'No app on the TV can open this link');
+      }).catch(() => alert('No app on the TV can open this link'));
+    }
+  }).catch(() => alert('No app on the TV can open this link'));
+}
+
+function sendText(){
+  const t = document.getElementById('typeInput').value;
+  if(!t) return;
+  api('/type?text=' + encodeURIComponent(t), {method:'POST'}).then(r => {
+    if(r.ok) {
+      document.getElementById('typeInput').value = '';
+    } else {
+      alert('Typing failed. Ensure input field is focused on TV and Accessibility Service is enabled.');
+    }
+  });
+}
+
+function loadFavorites(){
+  api('/favorites').then(r=>r.json()).then(data=>{
+    FAVS = data;
+    renderFavs();
+  }).catch(()=>{});
+}
+
+function loadHidden(){
+  api('/hidden').then(r=>r.json()).then(data=>{
+    HIDDEN = data;
+    renderHidden();
+  }).catch(()=>{});
+}
+
+function updateFav(pkg, pinned){
+  api('/favorites', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({pkg: pkg, pinned: pinned})
+  }).then(r=>{
+    if(r.ok) { loadFavorites(); }
+  });
+}
+
+function updateHid(pkg, hidden){
+  api('/hidden', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({pkg: pkg, hidden: hidden})
+  }).then(r=>{
+    if(r.ok) { loadHidden(); loadFavorites(); }
+  });
+}
+
+function renderFavs(){
+  favList.innerHTML = FAVS.length === 0 ? '<div style="padding:8px;color:#8090a8;font-size:14px">No favorite apps</div>' : '';
+  FAVS.forEach(item => {
+    const d = document.createElement('div');
+    d.className = 'app-row';
+    d.innerHTML = '<span>' + escapeHtml(item.label) + '</span>';
+    const b = document.createElement('button');
+    b.className = 'btn-sm btn-danger';
+    b.textContent = 'Unpin';
+    b.onclick = () => updateFav(item.pkg, false);
+    d.appendChild(b);
+    favList.appendChild(d);
+  });
+}
+
+function renderHidden(){
+  hiddenList.innerHTML = HIDDEN.length === 0 ? '<div style="padding:8px;color:#8090a8;font-size:14px">No hidden apps</div>' : '';
+  HIDDEN.forEach(item => {
+    const d = document.createElement('div');
+    d.className = 'app-row';
+    d.innerHTML = '<span>' + escapeHtml(item.label) + '</span>';
+    const b = document.createElement('button');
+    b.className = 'btn-sm';
+    b.textContent = 'Unhide';
+    b.onclick = () => updateHid(item.pkg, false);
+    d.appendChild(b);
+    hiddenList.appendChild(d);
+  });
+}
+
+function renameApp(pkg, newName) {
+  api('/rename', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ pkg: pkg, name: newName })
+  }).then(r => {
+    if (r.ok) start();
+  });
+}
+
+function uploadCardImage(pkg, file) {
+  if (!file) return;
+  api('/cardimage?pkg=' + encodeURIComponent(pkg), {
+    method: 'POST',
+    body: file
+  }).then(r => {
+    if (r.ok) {
+      alert('Custom card image saved');
+      start();
+    } else {
+      alert('Image upload failed');
+    }
+  });
+}
+
+function resetCardImage(pkg) {
+  api('/cardimage?pkg=' + encodeURIComponent(pkg) + '&action=reset', {
+    method: 'POST'
+  }).then(r => {
+    if (r.ok) {
+      alert('Card image reset to default');
+      start();
+    }
+  });
+}
+
+function resetUsageStats() {
+  if (confirm('Reset launch counts for all apps?')) {
+    api('/resetusage', { method: 'POST' }).then(r => {
+      if (r.ok) {
+        alert('Usage stats reset');
+        start();
+      }
+    });
+  }
+}
+
+function renderAppEditor() {
+  const container = document.getElementById('appEditorList');
+  container.innerHTML = '';
+  APPS.forEach(a => {
+    const card = document.createElement('div');
+    card.className = 'app-card-editor';
+
+    const header = document.createElement('div');
+    header.className = 'app-card-title';
+    header.innerHTML = escapeHtml(a.label) + '<span class="app-card-sub">Launches: ' + (a.launches || 0) + '</span>';
+    card.appendChild(header);
+
+    const controls = document.createElement('div');
+    controls.className = 'editor-controls';
+
+    // Rename Row
+    const renameRow = document.createElement('div');
+    renameRow.className = 'editor-row';
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = a.label;
+    nameInput.placeholder = a.defaultLabel || 'App Name';
+
+    const saveNameBtn = document.createElement('button');
+    saveNameBtn.className = 'btn-sm';
+    saveNameBtn.textContent = 'Rename';
+    saveNameBtn.onclick = () => renameApp(a.pkg, nameInput.value);
+
+    const resetNameBtn = document.createElement('button');
+    resetNameBtn.className = 'btn-sm';
+    resetNameBtn.textContent = 'Reset Name';
+    resetNameBtn.onclick = () => renameApp(a.pkg, '');
+
+    renameRow.appendChild(nameInput);
+    renameRow.appendChild(saveNameBtn);
+    renameRow.appendChild(resetNameBtn);
+    controls.appendChild(renameRow);
+
+    // Custom Image Row
+    const imgRow = document.createElement('div');
+    imgRow.className = 'editor-row';
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.style.fontSize = '12px';
+
+    const uploadBtn = document.createElement('button');
+    uploadBtn.className = 'btn-sm';
+    uploadBtn.textContent = 'Upload Image';
+    uploadBtn.onclick = () => {
+      if (fileInput.files && fileInput.files[0]) {
+        uploadCardImage(a.pkg, fileInput.files[0]);
+      } else {
+        alert('Please choose an image file first');
+      }
+    };
+
+    imgRow.appendChild(fileInput);
+    imgRow.appendChild(uploadBtn);
+
+    if (a.hasCustomImage) {
+      const resetImgBtn = document.createElement('button');
+      resetImgBtn.className = 'btn-sm btn-danger';
+      resetImgBtn.textContent = 'Reset Image';
+      resetImgBtn.onclick = () => resetCardImage(a.pkg);
+      imgRow.appendChild(resetImgBtn);
+    }
+
+    controls.appendChild(imgRow);
+    card.appendChild(controls);
+    container.appendChild(card);
+  });
+}
+
+function render(){
+  const t=q.value.toLowerCase();
+  apps.innerHTML='';
+  const favPkgs = FAVS.map(f=>f.pkg);
+  APPS.filter(a=>a.label.toLowerCase().includes(t)).forEach(a=>{
+    const d=document.createElement('div');
+    d.className = 'app-row';
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = a.label + (a.launches ? ' (' + a.launches + ')' : '');
+    nameSpan.style.cursor = 'pointer';
+    nameSpan.onclick = () => api('/launch?pkg='+encodeURIComponent(a.pkg),{method:'POST'});
+    d.appendChild(nameSpan);
+
+    const isFav = favPkgs.includes(a.pkg);
+    const favBtn = document.createElement('button');
+    favBtn.className = 'btn-sm';
+    favBtn.textContent = isFav ? 'Unpin' : 'Pin';
+    favBtn.onclick = () => updateFav(a.pkg, !isFav);
+    d.appendChild(favBtn);
+
+    const hideBtn = document.createElement('button');
+    hideBtn.className = 'btn-sm btn-danger';
+    hideBtn.textContent = 'Hide';
+    hideBtn.onclick = () => updateHid(a.pkg, true);
+    d.appendChild(hideBtn);
+
+    apps.appendChild(d);
+  });
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function up(){
+  const f=wp.files[0];
+  if(!f)return;
+  api('/wallpaper',{method:'POST',body:f}).then(r=>alert(r.ok?'Wallpaper updated':'Upload failed (max 8 MB)'));
+}
+
+function loadSettings(){
+  api('/settings').then(r=>r.json()).then(s=>{
+    document.getElementById('userName').value = s.userName || '';
+    document.getElementById('is12h').value = s.is12h ? 'true' : 'false';
+    document.getElementById('showSeconds').checked = !!s.showSeconds;
+    document.getElementById('showDate').checked = !!s.showDate;
+    document.getElementById('sortMode').value = s.sortMode || 'alphabetical';
+    if (s.accessibilityEnabled === false) {
+      document.getElementById('accNote').style.display = 'block';
+    } else {
+      document.getElementById('accNote').style.display = 'none';
+    }
+  }).catch(()=>{});
+}
+
+function saveSettings(){
+  const data = {
+    userName: document.getElementById('userName').value.trim(),
+    is12h: document.getElementById('is12h').value === 'true',
+    showSeconds: document.getElementById('showSeconds').checked,
+    showDate: document.getElementById('showDate').checked,
+    sortMode: document.getElementById('sortMode').value
+  };
+  api('/settings', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  }).then(r=>{
+    if(r.ok) {
+      alert('Settings saved');
+      start();
+    } else alert('Failed to save settings');
+  }).catch(()=>alert('Network error'));
+}
+</script></body></html>

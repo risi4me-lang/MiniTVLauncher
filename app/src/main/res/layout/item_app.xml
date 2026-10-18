@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:gravity="center_horizontal"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="12dp"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:focusable="true"
+    android:clickable="true">
+
+    <!-- 240x135dp Rounded Card Container -->
+    <FrameLayout
+        android:id="@+id/cardContainer"
+        android:layout_width="240dp"
+        android:layout_height="135dp"
+        android:background="@drawable/card_bg"
+        android:elevation="4dp"
+        android:clipChildren="true"
+        android:clipToPadding="true">
+
+        <!-- TV Banner Image (if available) -->
+        <ImageView
+            android:id="@+id/cardImage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:visibility="gone" />
+
+        <!-- Fallback Gradient + Centered Icon (if no banner) -->
+        <FrameLayout
+            android:id="@+id/iconLayout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <ImageView
+                android:id="@+id/cardIcon"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:layout_gravity="center"
+                android:scaleType="fitCenter" />
+        </FrameLayout>
+
+        <!-- Focus Ring Border Overlay (Thin White Ring) -->
+        <View
+            android:id="@+id/cardBorder"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/card_border"
+            android:alpha="0" />
+    </FrameLayout>
+
+    <!-- App Name Label (fades in on focus) -->
+    <TextView
+        android:id="@+id/label"
+        android:layout_width="240dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="#FFFFFF"
+        android:textSize="15sp"
+        android:fontFamily="sans-serif-medium"
+        android:alpha="0" />
+</LinearLayout>

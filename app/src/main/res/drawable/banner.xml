@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <!-- Background Gradient / Frame -->
+    <path
+        android:pathData="M0,0 L320,0 L320,180 L0,180 Z"
+        android:fillColor="#1B2440" />
+    <path
+        android:pathData="M0,0 L320,0 L320,180 L0,180 Z"
+        android:fillColor="#0B0F1A"
+        android:fillAlpha="0.4" />
+    <!-- Blue Accent Bar -->
+    <path
+        android:pathData="M0,172 L320,172 L320,180 L0,180 Z"
+        android:fillColor="#2F5BFF" />
+    <!-- TV Icon Graphic -->
+    <path
+        android:pathData="M40,45 L110,45 A6,6 0 0,1 116,51 L116,115 A6,6 0 0,1 110,121 L40,121 A6,6 0 0,1 34,115 L34,51 A6,6 0 0,1 40,45 Z"
+        android:strokeColor="#2F5BFF"
+        android:strokeWidth="5"
+        android:fillColor="#0B0F1A" />
+    <path
+        android:pathData="M63,121 L87,121 L92,135 L58,135 Z"
+        android:fillColor="#2F5BFF" />
+    <!-- Grid inside TV Graphic -->
+    <path
+        android:pathData="M52,62 L70,62 L70,80 L52,80 Z M78,62 L98,62 L98,80 L78,80 Z M52,88 L70,88 L70,104 L52,104 Z M78,88 L104,88 L104,104 L78,104 Z"
+        android:fillColor="#FFFFFF" />
+    <!-- Banner Text "MINI LAUNCHER" Graphic Shapes -->
+    <!-- M -->
+    <path
+        android:pathData="M140,70 L146,70 L152,90 L158,70 L164,70 L164,105 L158,105 L158,82 L153,100 L149,100 L144,82 L144,105 L140,105 Z"
+        android:fillColor="#FFFFFF" />
+    <!-- I -->
+    <path
+        android:pathData="M170,70 L176,70 L176,105 L170,105 Z"
+        android:fillColor="#FFFFFF" />
+    <!-- N -->
+    <path
+        android:pathData="M182,70 L188,70 L200,95 L200,70 L205,70 L205,105 L199,105 L187,80 L187,105 L182,105 Z"
+        android:fillColor="#FFFFFF" />
+    <!-- I -->
+    <path
+        android:pathData="M211,70 L217,70 L217,105 L211,105 Z"
+        android:fillColor="#FFFFFF" />
+    <!-- Subtitle text / bar -->
+    <path
+        android:pathData="M140,114 L260,114 L260,118 L140,118 Z"
+        android:fillColor="#2F5BFF" />
+</vector>
