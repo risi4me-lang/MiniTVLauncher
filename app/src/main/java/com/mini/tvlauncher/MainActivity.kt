@@ -3,6 +3,7 @@ package com.mini.tvlauncher
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.SearchManager
+import android.app.role.RoleManager
 import android.content.*
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -104,6 +105,11 @@ class MainActivity : Activity() {
     private lateinit var searchInput: EditText
     private lateinit var searchAppResults: LinearLayout
 
+    private lateinit var keyTesterPanel: FrameLayout
+    private lateinit var keyTesterCodeText: TextView
+    private lateinit var keyTesterScanText: TextView
+    private lateinit var keyTesterNameText: TextView
+
     private lateinit var homeQrCard: LinearLayout
     private lateinit var homeQrImageView: ImageView
     private lateinit var homeQrCaption: TextView
@@ -199,6 +205,12 @@ class MainActivity : Activity() {
         findViewById<View>(R.id.searchWebBtn).setOnClickListener { executeWebSearch(searchInput.text.toString()) }
         findViewById<View>(R.id.searchYoutubeBtn).setOnClickListener { executeYoutubeSearch(searchInput.text.toString()) }
 
+        keyTesterPanel = findViewById(R.id.keyTesterPanel)
+        keyTesterCodeText = findViewById(R.id.keyTesterCodeText)
+        keyTesterScanText = findViewById(R.id.keyTesterScanText)
+        keyTesterNameText = findViewById(R.id.keyTesterNameText)
+        findViewById<View>(R.id.closeKeyTesterPanelBtn).setOnClickListener { closeKeyTesterPanel() }
+
         homeQrCard = findViewById(R.id.homeQrCard)
         homeQrImageView = findViewById(R.id.homeQrImageView)
         homeQrCaption = findViewById(R.id.homeQrCaption)
@@ -254,6 +266,15 @@ class MainActivity : Activity() {
         requestNotificationPermissionIfNeeded()
     }
 
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (keyTesterPanel.visibility == View.VISIBLE) {
+            keyTesterCodeText.text = "KeyCode: ${event.keyCode}"
+            keyTesterScanText.text = "ScanCode: ${event.scanCode}"
+            keyTesterNameText.text = "KeyName: ${KeyEvent.keyCodeToString(event.keyCode)}"
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     private fun isChildOf(parent: ViewGroup, child: View): Boolean {
         var p = child.parent
         while (p != null) {
@@ -285,6 +306,35 @@ class MainActivity : Activity() {
             activeInstance = null
         }
         super.onDestroy()
+    }
+
+    // ---- Key Tester Methods ----
+    private fun openKeyTesterPanel() {
+        keyTesterPanel.visibility = View.VISIBLE
+        findViewById<View>(R.id.closeKeyTesterPanelBtn).requestFocus()
+    }
+
+    private fun closeKeyTesterPanel() {
+        keyTesterPanel.visibility = View.GONE
+        toolsRow.requestFocus()
+    }
+
+    // ---- Default Home Request ----
+    private fun openDefaultHomeChooser() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val rm = getSystemService(RoleManager::class.java)
+                if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_HOME)) {
+                    val intent = rm.createRequestRoleIntent(RoleManager.ROLE_HOME)
+                    startActivity(intent)
+                    return
+                }
+            }
+            val intent = Intent(Settings.ACTION_HOME_SETTINGS)
+            startActivity(intent)
+        } catch (_: Exception) {
+            Toast.makeText(this, "Not supported on this device", Toast.LENGTH_SHORT).show()
+        }
     }
 
     // ---- Search Panel Methods ----
@@ -434,6 +484,8 @@ class MainActivity : Activity() {
                 "hidden_apps" -> openHiddenAppsPanel()
                 "power" -> handlePowerClick()
                 "pair_phone" -> openPairingPanel()
+                "default_home" -> openDefaultHomeChooser()
+                "key_tester" -> openKeyTesterPanel()
                 else -> {
                     try {
                         tile.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -843,29 +895,35 @@ class MainActivity : Activity() {
         // 1. Power
         result.add(ToolTile("power", "Power", R.drawable.ic_tool_power, Intent()))
 
-        // 2. Settings
+        // 2. Default Home Chooser
+        result.add(ToolTile("default_home", "Default Home", R.drawable.ic_tool_launcher, Intent()))
+
+        // 3. Remote Key Tester
+        result.add(ToolTile("key_tester", "Key Tester", R.drawable.ic_tool_settings, Intent()))
+
+        // 4. Settings
         checkAndAdd("settings", "Settings", R.drawable.ic_tool_settings, Intent(Settings.ACTION_SETTINGS))
 
-        // 3. Wi-Fi
+        // 5. Wi-Fi
         checkAndAdd("wifi", "Wi-Fi", R.drawable.ic_tool_wifi, Intent(Settings.ACTION_WIFI_SETTINGS))
 
-        // 4. Bluetooth (Pair Speaker)
+        // 6. Bluetooth (Pair Speaker)
         checkAndAdd("bluetooth", "Pair Speaker", R.drawable.ic_tool_bluetooth, Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
 
-        // 5. Display
+        // 7. Display
         checkAndAdd("display", "Display", R.drawable.ic_tool_display, Intent(Settings.ACTION_DISPLAY_SETTINGS))
 
-        // 6. Pair Phone (If Home QR tile is hidden)
+        // 8. Pair Phone (If Home QR tile is hidden)
         val mode = prefs.getString("home_qr_mode", "always") ?: "always"
         val hasPaired = getPairedDevicesList().isNotEmpty()
         if (mode == "off" || (mode == "until_paired" && hasPaired)) {
             result.add(ToolTile("pair_phone", "Pair Phone", R.drawable.ic_tool_wifi, Intent()))
         }
 
-        // 7. Hidden Apps
+        // 9. Hidden Apps
         result.add(ToolTile("hidden_apps", "Hidden Apps", R.drawable.ic_tool_hidden, Intent()))
 
-        // 8. Original Launcher (Fallback to Settings > Apps)
+        // 10. Original Launcher (Fallback to Settings > Apps)
         val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         @Suppress("DEPRECATION")
         val homeMatches = pm.queryIntentActivities(homeIntent, 0)
@@ -1138,6 +1196,10 @@ class MainActivity : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (keyTesterPanel.visibility == View.VISIBLE) {
+            closeKeyTesterPanel()
+            return
+        }
         if (searchPanel.visibility == View.VISIBLE) {
             closeSearchPanel()
             return
@@ -1356,7 +1418,10 @@ class MainActivity : Activity() {
         val f = File(filesDir, "wallpaper.jpg")
         val idx = prefs.getInt("preset", 0)
         if (prefs.getBoolean("custom", false) && f.exists()) {
-            wallpaper.setImageBitmap(BitmapFactory.decodeFile(f.path))
+            val bmp = BitmapFactory.decodeFile(f.path)
+            if (bmp != null) {
+                wallpaper.setImageBitmap(bmp)
+            }
         } else {
             val c = presets[idx.coerceIn(0, presets.size - 1)].second
             wallpaper.setImageDrawable(GradientDrawable(GradientDrawable.Orientation.TL_BR, c))

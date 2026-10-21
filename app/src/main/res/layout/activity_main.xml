@@ -204,6 +204,110 @@
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
+    <!-- Remote Key Tester Overlay Panel -->
+    <FrameLayout
+        android:id="@+id/keyTesterPanel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#E60B0F1A"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <ScrollView
+            android:layout_width="560dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:padding="24dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:background="@drawable/card_bg"
+                android:padding="28dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Remote Key Tester"
+                    android:textColor="#FFFFFF"
+                    android:textSize="22sp"
+                    android:fontFamily="sans-serif-medium" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Press any remote button to inspect key code"
+                    android:textColor="#8090A8"
+                    android:textSize="14sp"
+                    android:layout_marginTop="4dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:background="@drawable/pill_bg"
+                    android:padding="20dp"
+                    android:layout_marginTop="20dp">
+
+                    <TextView
+                        android:id="@+id/keyTesterCodeText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="KeyCode: --"
+                        android:textColor="#FFFFFF"
+                        android:textSize="18sp"
+                        android:fontFamily="sans-serif-medium" />
+
+                    <TextView
+                        android:id="@+id/keyTesterScanText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="ScanCode: --"
+                        android:textColor="#B0C0E0"
+                        android:textSize="16sp"
+                        android:layout_marginTop="6dp" />
+
+                    <TextView
+                        android:id="@+id/keyTesterNameText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="KeyName: Press a key..."
+                        android:textColor="#4080FF"
+                        android:textSize="18sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:layout_marginTop="6dp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="end"
+                    android:layout_marginTop="24dp">
+
+                    <TextView
+                        android:id="@+id/closeKeyTesterPanelBtn"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Close"
+                        android:textColor="#FFFFFF"
+                        android:textSize="14sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:paddingStart="24dp"
+                        android:paddingTop="8dp"
+                        android:paddingEnd="24dp"
+                        android:paddingBottom="8dp"
+                        android:focusable="true"
+                        android:clickable="true"
+                        android:background="@drawable/pill_bg" />
+                </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
+    </FrameLayout>
+
     <!-- Search Overlay Panel -->
     <FrameLayout
         android:id="@+id/searchPanel"

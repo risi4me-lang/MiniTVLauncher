@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Mini Launcher</string>
-    <string name="remote_service_name">Phone Remote Service</string>
-    <string name="accessibility_service_label">Mini Launcher Remote Service</string>
-    <string name="accessibility_service_description">Allows the phone remote to send text typing and perform global Back and Home actions across all TV apps.</string>
+    <string name="app_name">MiniTVLauncher</string>
+    <string name="home_key_service_description">Remaps projector remote Home / All Apps button to launch Mini Launcher.</string>
+    <string name="accessibility_service_description">Remote D-pad navigation service for Mini Launcher.</string>
 </resources>
