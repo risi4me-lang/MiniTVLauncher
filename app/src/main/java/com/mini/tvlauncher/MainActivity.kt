@@ -40,8 +40,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.lang.ref.WeakReference
+import java.net.HttpURLConnection
 import java.net.Inet4Address
 import java.net.NetworkInterface
+import java.net.URL
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.*
@@ -114,6 +116,10 @@ class MainActivity : Activity() {
     private lateinit var screensaverPanel: FrameLayout
     private lateinit var screensaverClockContainer: LinearLayout
 
+    private lateinit var weatherContainer: LinearLayout
+    private lateinit var weatherIcon: ImageView
+    private lateinit var weatherText: TextView
+
     private lateinit var homeQrCard: LinearLayout
     private lateinit var homeQrImageView: ImageView
     private lateinit var homeQrCaption: TextView
@@ -139,6 +145,14 @@ class MainActivity : Activity() {
             if (minutes > 0) {
                 slideshowHandler.postDelayed(this, minutes * 60 * 1000L)
             }
+        }
+    }
+
+    private val weatherHandler = Handler(Looper.getMainLooper())
+    private val weatherRunnable = object : Runnable {
+        override fun run() {
+            fetchWeatherBackground()
+            weatherHandler.postDelayed(this, 30 * 60 * 1000L)
         }
     }
 
@@ -171,6 +185,8 @@ class MainActivity : Activity() {
             runOnUiThread { updateHomeQrVisibility(); refreshToolsRow() }
         } else if (key == "screensaver_timeout_minutes") {
             runOnUiThread { resetIdleTimer() }
+        } else if (key == "weather_city" || key == "weather_unit") {
+            runOnUiThread { fetchWeatherBackground() }
         }
     }
 
@@ -179,8 +195,8 @@ class MainActivity : Activity() {
     private var currentQrBitmap: Bitmap? = null
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(network: Network) { updateNetworkStatus(); refreshHomeQrCode() }
-        override fun onLost(network: Network) { updateNetworkStatus(); refreshHomeQrCode() }
+        override fun onAvailable(network: Network) { updateNetworkStatus(); refreshHomeQrCode(); fetchWeatherBackground() }
+        override fun onLost(network: Network) { updateNetworkStatus(); refreshHomeQrCode(); fetchWeatherBackground() }
         override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) { updateNetworkStatus() }
     }
 
@@ -208,6 +224,10 @@ class MainActivity : Activity() {
         mainScrollView = findViewById(R.id.mainScrollView)
         toolsRow = findViewById(R.id.toolsRow)
         rowsContainer = findViewById(R.id.rowsContainer)
+
+        weatherContainer = findViewById(R.id.weatherContainer)
+        weatherIcon = findViewById(R.id.weatherIcon)
+        weatherText = findViewById(R.id.weatherText)
 
         screensaverPanel = findViewById(R.id.screensaverPanel)
         screensaverClockContainer = findViewById(R.id.screensaverClockContainer)
@@ -313,6 +333,105 @@ class MainActivity : Activity() {
         requestNotificationPermissionIfNeeded()
     }
 
+    // ---- Weather Polling & Display ----
+    private fun fetchWeatherBackground() {
+        val cityName = prefs.getString("weather_city", "")?.trim() ?: ""
+        val unit = prefs.getString("weather_unit", "c") ?: "c"
+
+        if (cityName.isEmpty()) {
+            weatherContainer.visibility = View.GONE
+            return
+        }
+
+        // Show cached result first if available
+        showCachedWeatherOrHide(cityName, unit)
+
+        thread {
+            try {
+                // 1. Geocode search
+                val geoUrl = "https://geocoding-api.open-meteo.com/v1/search?name=" + Uri.encode(cityName) + "&count=1"
+                val geoJson = httpGet(geoUrl) ?: throw Exception("Geocode network failed")
+                val geoObj = JSONObject(geoJson)
+                val results = geoObj.optJSONArray("results") ?: throw Exception("No geocode results")
+                if (results.length() == 0) throw Exception("City not found")
+                val first = results.getJSONObject(0)
+                val lat = first.getDouble("latitude")
+                val lon = first.getDouble("longitude")
+                val matchedName = first.optString("name", cityName)
+
+                // 2. Forecast fetch
+                val unitParam = if (unit == "f") "&temperature_unit=fahrenheit" else ""
+                val forecastUrl = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current_weather=true$unitParam"
+                val forecastJson = httpGet(forecastUrl) ?: throw Exception("Forecast network failed")
+                val forecastObj = JSONObject(forecastJson)
+                val currentWeather = forecastObj.getJSONObject("current_weather")
+                val temp = currentWeather.getDouble("temperature")
+                val code = currentWeather.getInt("weathercode")
+
+                // Cache
+                prefs.edit()
+                    .putFloat("cached_weather_temp", temp.toFloat())
+                    .putInt("cached_weather_code", code)
+                    .putString("cached_weather_city", matchedName)
+                    .putString("cached_weather_unit", unit)
+                    .apply()
+
+                runOnUiThread {
+                    updateWeatherUi(temp, code, matchedName, unit)
+                }
+            } catch (_: Exception) {
+                runOnUiThread {
+                    showCachedWeatherOrHide(cityName, unit)
+                }
+            }
+        }
+    }
+
+    private fun showCachedWeatherOrHide(cityName: String, unit: String) {
+        val cachedCity = prefs.getString("cached_weather_city", "") ?: ""
+        val cachedUnit = prefs.getString("cached_weather_unit", "c") ?: "c"
+        if (cachedCity.equals(cityName, ignoreCase = true) && cachedUnit == unit && prefs.contains("cached_weather_temp")) {
+            val temp = prefs.getFloat("cached_weather_temp", 0f).toDouble()
+            val code = prefs.getInt("cached_weather_code", 0)
+            updateWeatherUi(temp, code, cachedCity, cachedUnit)
+        } else {
+            weatherContainer.visibility = View.GONE
+        }
+    }
+
+    private fun updateWeatherUi(temp: Double, code: Int, city: String, unit: String) {
+        val unitLabel = if (unit == "f") "°F" else "°C"
+        val formattedTemp = Math.round(temp).toString() + unitLabel
+        weatherText.text = "$formattedTemp  $city"
+        weatherIcon.setImageResource(getWeatherIconRes(code))
+        weatherContainer.visibility = View.VISIBLE
+    }
+
+    private fun getWeatherIconRes(code: Int): Int {
+        return when (code) {
+            0 -> R.drawable.ic_weather_sunny
+            1, 2, 3 -> R.drawable.ic_weather_cloudy
+            45, 48 -> R.drawable.ic_weather_fog
+            51, 53, 55, 61, 63, 65, 80, 81, 82 -> R.drawable.ic_weather_rain
+            71, 73, 75, 77, 85, 86 -> R.drawable.ic_weather_snow
+            95, 96, 99 -> R.drawable.ic_weather_thunder
+            else -> R.drawable.ic_weather_cloudy
+        }
+    }
+
+    private fun httpGet(urlStr: String): String? {
+        return try {
+            val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 8000
+                readTimeout = 8000
+                requestMethod = "GET"
+            }
+            if (conn.responseCode == 200) {
+                conn.inputStream.use { it.bufferedReader().readText() }
+            } else null
+        } catch (_: Exception) { null }
+    }
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         resetIdleTimer()
         if (screensaverPanel.visibility == View.VISIBLE) {
@@ -404,6 +523,7 @@ class MainActivity : Activity() {
         prefs.unregisterOnSharedPreferenceChangeListener(prefChangeListener)
         qrHandler.removeCallbacks(qrRefreshRunnable)
         slideshowHandler.removeCallbacks(slideshowRunnable)
+        weatherHandler.removeCallbacks(weatherRunnable)
         idleHandler.removeCallbacks(idleRunnable)
         driftHandler.removeCallbacks(driftRunnable)
         homeQrBitmap?.recycle()
@@ -1292,12 +1412,16 @@ class MainActivity : Activity() {
             slideshowHandler.postDelayed(slideshowRunnable, intervalMinutes * 60 * 1000L)
         }
 
+        weatherHandler.removeCallbacks(weatherRunnable)
+        weatherHandler.post(weatherRunnable)
+
         resetIdleTimer()
     }
 
     override fun onStop() {
         qrHandler.removeCallbacks(qrRefreshRunnable)
         slideshowHandler.removeCallbacks(slideshowRunnable)
+        weatherHandler.removeCallbacks(weatherRunnable)
         idleHandler.removeCallbacks(idleRunnable)
         driftHandler.removeCallbacks(driftRunnable)
         if (activeInstance?.get() == this) {

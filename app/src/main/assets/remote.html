@@ -217,6 +217,18 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
     </div>
 
     <div class="card">
+      <label class="section-title">Weather City</label>
+      <input type="text" id="weatherCity" class="input-field" placeholder="e.g. London, New Delhi, New York">
+      <div style="margin-top:10px">
+        <label class="section-title">Temperature Unit</label>
+        <select id="weatherUnit" class="select-field" onchange="saveSettings()">
+          <option value="c">°C (Celsius)</option>
+          <option value="f">°F (Fahrenheit)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
       <label class="section-title">Wallpaper Slideshow</label>
       <select id="slideshowInterval" class="select-field" onchange="saveSettings()">
         <option value="0">Off (Static Wallpaper)</option>
@@ -1115,6 +1127,8 @@ function loadSettings() {
     document.getElementById('groupByCategory').checked = s.groupByCategory !== false;
     document.getElementById('slideshowInterval').value = s.slideshowInterval !== undefined ? s.slideshowInterval : 0;
     document.getElementById('screensaverTimeout').value = s.screensaverTimeout !== undefined ? s.screensaverTimeout : 0;
+    document.getElementById('weatherCity').value = s.weatherCity || '';
+    document.getElementById('weatherUnit').value = s.weatherUnit || 'c';
     updateAccDots(s.accessibilityEnabled !== false);
   }).catch(() => {});
 }
@@ -1129,7 +1143,9 @@ function saveSettings() {
     homeQrMode: document.getElementById('homeQrMode').value,
     groupByCategory: document.getElementById('groupByCategory').checked,
     slideshowInterval: parseInt(document.getElementById('slideshowInterval').value) || 0,
-    screensaverTimeout: parseInt(document.getElementById('screensaverTimeout').value) || 0
+    screensaverTimeout: parseInt(document.getElementById('screensaverTimeout').value) || 0,
+    weatherCity: document.getElementById('weatherCity').value.trim(),
+    weatherUnit: document.getElementById('weatherUnit').value
   };
   api('/settings', {
     method: 'POST',

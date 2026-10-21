@@ -46,7 +46,7 @@
             android:clipChildren="false"
             android:clipToPadding="false">
 
-            <!-- Header: Top Left Greeting, Clock, Date | Top Right Search, QR Tile, Net Icon, Wallpaper -->
+            <!-- Header: Top Left Greeting, Clock, Date, Weather | Top Right Search, QR Tile, Net Icon, Wallpaper -->
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -89,6 +89,32 @@
                         android:fontFamily="sans-serif-light"
                         android:format12Hour="EEEE, MMMM d"
                         android:format24Hour="EEEE, MMMM d" />
+
+                    <!-- Weather Info Container -->
+                    <LinearLayout
+                        android:id="@+id/weatherContainer"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginTop="4dp"
+                        android:visibility="gone">
+
+                        <ImageView
+                            android:id="@+id/weatherIcon"
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:scaleType="fitCenter" />
+
+                        <TextView
+                            android:id="@+id/weatherText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="#E2E8F0"
+                            android:textSize="15sp"
+                            android:fontFamily="sans-serif-medium"
+                            android:layout_marginStart="8dp" />
+                    </LinearLayout>
                 </LinearLayout>
 
                 <LinearLayout
