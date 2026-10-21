@@ -1352,7 +1352,7 @@ class MainActivity : Activity() {
     }
 
     // ---- Wallpaper ----
-    private fun applyWallpaper() {
+    fun applyWallpaper() {
         val f = File(filesDir, "wallpaper.jpg")
         val idx = prefs.getInt("preset", 0)
         if (prefs.getBoolean("custom", false) && f.exists()) {

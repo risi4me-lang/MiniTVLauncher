@@ -270,7 +270,7 @@ class RemoteServer(private val pin: String, private val host: RemoteHost) {
                         val ok = if (action == "reset") {
                             host.resetCardImage(pkg)
                         } else {
-                            if (len <= 0 || len > 8_000_000) { reply(out, 413, "text/plain", ByteArray(0)); return }
+                            if (len <= 0 || len > 8_000_000) { reply(out, 413, "text/plain", "Image too large (max 8 MB)".toByteArray(Charsets.UTF_8)); return }
                             val buf = ByteArray(len)
                             var n = 0
                             while (n < len) { val r = inp.read(buf, n, len - n); if (r < 0) break; n += r }
@@ -284,11 +284,22 @@ class RemoteServer(private val pin: String, private val host: RemoteHost) {
                     }
                     "/launch" -> reply(out, if (host.launchPkg(q["pkg"] ?: "")) 200 else 404, "text/plain", ByteArray(0))
                     "/wallpaper" -> {
-                        if (len <= 0 || len > 8_000_000) { reply(out, 413, "text/plain", ByteArray(0)); return }
+                        if (len > 8_000_000) {
+                            reply(out, 413, "text/plain", "Image too large (max 8 MB)".toByteArray(Charsets.UTF_8))
+                            return
+                        }
+                        if (len <= 0) {
+                            reply(out, 400, "text/plain", "Unsupported image format".toByteArray(Charsets.UTF_8))
+                            return
+                        }
                         val buf = ByteArray(len)
                         var n = 0
                         while (n < len) { val r = inp.read(buf, n, len - n); if (r < 0) break; n += r }
-                        reply(out, if (n == len && host.saveWallpaper(buf)) 200 else 400, "text/plain", ByteArray(0))
+                        if (n == len && host.saveWallpaper(buf)) {
+                            reply(out, 200, "text/plain", "ok".toByteArray(Charsets.UTF_8))
+                        } else {
+                            reply(out, 400, "text/plain", "Unsupported image format".toByteArray(Charsets.UTF_8))
+                        }
                     }
                     "/favorites" -> {
                         if (method == "GET") {

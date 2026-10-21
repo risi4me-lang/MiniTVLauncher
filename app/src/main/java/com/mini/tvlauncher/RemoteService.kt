@@ -360,16 +360,25 @@ class RemoteService : Service(), RemoteHost {
         return try {
             val b = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, b)
-            if (b.outWidth <= 0) return false
+            if (b.outWidth <= 0 || b.outHeight <= 0) return false
+
             var s = 1
             while (b.outWidth / (s * 2) >= 1920) s *= 2
             val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size,
                 BitmapFactory.Options().apply { inSampleSize = s }) ?: return false
-            File(filesDir, "wallpaper.jpg").outputStream().use {
-                bmp.compress(Bitmap.CompressFormat.JPEG, 90, it)
+
+            File(filesDir, "wallpaper.jpg").outputStream().use { out ->
+                bmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
             }
             bmp.recycle()
-            prefs.edit().putBoolean("custom", true).putLong("wallpaper_version", System.currentTimeMillis()).apply()
+
+            prefs.edit()
+                .putBoolean("custom", true)
+                .putLong("wallpaper_version", System.currentTimeMillis())
+                .apply()
+
+            val main = MainActivity.activeInstance?.get()
+            main?.runOnUiThread { main.applyWallpaper() }
             true
         } catch (_: Exception) { false }
     }
