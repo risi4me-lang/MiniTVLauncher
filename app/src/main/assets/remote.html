@@ -228,6 +228,16 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
     </div>
 
     <div class="card">
+      <label class="section-title">In-Launcher Screensaver</label>
+      <select id="screensaverTimeout" class="select-field" onchange="saveSettings()">
+        <option value="0">Off</option>
+        <option value="5">After 5 minutes</option>
+        <option value="10">After 10 minutes</option>
+        <option value="20">After 20 minutes</option>
+      </select>
+    </div>
+
+    <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <label class="section-title" style="margin:0">Uploaded Wallpapers (<span id="wpCount">0</span>/8)</label>
       </div>
@@ -1104,6 +1114,7 @@ function loadSettings() {
     document.getElementById('homeQrMode').value = s.homeQrMode || 'always';
     document.getElementById('groupByCategory').checked = s.groupByCategory !== false;
     document.getElementById('slideshowInterval').value = s.slideshowInterval !== undefined ? s.slideshowInterval : 0;
+    document.getElementById('screensaverTimeout').value = s.screensaverTimeout !== undefined ? s.screensaverTimeout : 0;
     updateAccDots(s.accessibilityEnabled !== false);
   }).catch(() => {});
 }
@@ -1117,7 +1128,8 @@ function saveSettings() {
     sortMode: document.getElementById('sortMode').value,
     homeQrMode: document.getElementById('homeQrMode').value,
     groupByCategory: document.getElementById('groupByCategory').checked,
-    slideshowInterval: parseInt(document.getElementById('slideshowInterval').value) || 0
+    slideshowInterval: parseInt(document.getElementById('slideshowInterval').value) || 0,
+    screensaverTimeout: parseInt(document.getElementById('screensaverTimeout').value) || 0
   };
   api('/settings', {
     method: 'POST',

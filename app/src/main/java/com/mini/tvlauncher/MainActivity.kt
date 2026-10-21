@@ -111,6 +111,9 @@ class MainActivity : Activity() {
     private lateinit var keyTesterScanText: TextView
     private lateinit var keyTesterNameText: TextView
 
+    private lateinit var screensaverPanel: FrameLayout
+    private lateinit var screensaverClockContainer: LinearLayout
+
     private lateinit var homeQrCard: LinearLayout
     private lateinit var homeQrImageView: ImageView
     private lateinit var homeQrCaption: TextView
@@ -139,6 +142,21 @@ class MainActivity : Activity() {
         }
     }
 
+    private val idleHandler = Handler(Looper.getMainLooper())
+    private val idleRunnable = Runnable {
+        showScreensaver()
+    }
+
+    private val driftHandler = Handler(Looper.getMainLooper())
+    private val driftRunnable = object : Runnable {
+        override fun run() {
+            if (screensaverPanel.visibility == View.VISIBLE) {
+                animateClockDrift()
+                driftHandler.postDelayed(this, 12_000L)
+            }
+        }
+    }
+
     private val prefs by lazy { getSharedPreferences("launcher", MODE_PRIVATE) }
     private val pkgReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, i: Intent?) = loadApps()
@@ -151,6 +169,8 @@ class MainActivity : Activity() {
             runOnUiThread { applyWallpaper() }
         } else if (key == "home_qr_mode" || key == "paired_devices_json") {
             runOnUiThread { updateHomeQrVisibility(); refreshToolsRow() }
+        } else if (key == "screensaver_timeout_minutes") {
+            runOnUiThread { resetIdleTimer() }
         }
     }
 
@@ -188,6 +208,10 @@ class MainActivity : Activity() {
         mainScrollView = findViewById(R.id.mainScrollView)
         toolsRow = findViewById(R.id.toolsRow)
         rowsContainer = findViewById(R.id.rowsContainer)
+
+        screensaverPanel = findViewById(R.id.screensaverPanel)
+        screensaverClockContainer = findViewById(R.id.screensaverClockContainer)
+        screensaverPanel.setOnClickListener { dismissScreensaver() }
 
         rowsContainer.layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
         rowsContainer.isNestedScrollingEnabled = false
@@ -290,12 +314,68 @@ class MainActivity : Activity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        resetIdleTimer()
+        if (screensaverPanel.visibility == View.VISIBLE) {
+            dismissScreensaver()
+            return true
+        }
         if (keyTesterPanel.visibility == View.VISIBLE) {
             keyTesterCodeText.text = "KeyCode: ${event.keyCode}"
             keyTesterScanText.text = "ScanCode: ${event.scanCode}"
             keyTesterNameText.text = "KeyName: ${KeyEvent.keyCodeToString(event.keyCode)}"
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
+        resetIdleTimer()
+        if (screensaverPanel.visibility == View.VISIBLE) {
+            dismissScreensaver()
+            return true
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
+    fun resetIdleTimer() {
+        runOnUiThread {
+            if (screensaverPanel.visibility == View.VISIBLE) {
+                dismissScreensaver()
+            }
+            idleHandler.removeCallbacks(idleRunnable)
+            val timeoutMinutes = prefs.getInt("screensaver_timeout_minutes", 0)
+            if (timeoutMinutes > 0) {
+                idleHandler.postDelayed(idleRunnable, timeoutMinutes * 60 * 1000L)
+            }
+        }
+    }
+
+    private fun showScreensaver() {
+        screensaverPanel.visibility = View.VISIBLE
+        screensaverClockContainer.translationX = 0f
+        screensaverClockContainer.translationY = 0f
+        driftHandler.removeCallbacks(driftRunnable)
+        driftHandler.post(driftRunnable)
+    }
+
+    private fun dismissScreensaver() {
+        screensaverPanel.visibility = View.GONE
+        driftHandler.removeCallbacks(driftRunnable)
+        resetIdleTimer()
+    }
+
+    private fun animateClockDrift() {
+        val maxDx = (160 * resources.displayMetrics.density).toInt()
+        val maxDy = (100 * resources.displayMetrics.density).toInt()
+        val random = Random()
+        val targetX = (random.nextInt(maxDx * 2) - maxDx).toFloat()
+        val targetY = (random.nextInt(maxDy * 2) - maxDy).toFloat()
+
+        screensaverClockContainer.animate()
+            .translationX(targetX)
+            .translationY(targetY)
+            .setDuration(3000)
+            .setInterpolator(DecelerateInterpolator())
+            .start()
     }
 
     private fun isChildOf(parent: ViewGroup, child: View): Boolean {
@@ -324,6 +404,8 @@ class MainActivity : Activity() {
         prefs.unregisterOnSharedPreferenceChangeListener(prefChangeListener)
         qrHandler.removeCallbacks(qrRefreshRunnable)
         slideshowHandler.removeCallbacks(slideshowRunnable)
+        idleHandler.removeCallbacks(idleRunnable)
+        driftHandler.removeCallbacks(driftRunnable)
         homeQrBitmap?.recycle()
         homeQrBitmap = null
         currentBmp?.recycle()
@@ -1209,11 +1291,15 @@ class MainActivity : Activity() {
         if (intervalMinutes > 0) {
             slideshowHandler.postDelayed(slideshowRunnable, intervalMinutes * 60 * 1000L)
         }
+
+        resetIdleTimer()
     }
 
     override fun onStop() {
         qrHandler.removeCallbacks(qrRefreshRunnable)
         slideshowHandler.removeCallbacks(slideshowRunnable)
+        idleHandler.removeCallbacks(idleRunnable)
+        driftHandler.removeCallbacks(driftRunnable)
         if (activeInstance?.get() == this) {
             activeInstance = null
         }
@@ -1229,6 +1315,10 @@ class MainActivity : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (screensaverPanel.visibility == View.VISIBLE) {
+            dismissScreensaver()
+            return
+        }
         if (keyTesterPanel.visibility == View.VISIBLE) {
             closeKeyTesterPanel()
             return
@@ -1251,6 +1341,7 @@ class MainActivity : Activity() {
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
+        resetIdleTimer()
         mainScrollView.smoothScrollTo(0, 0)
     }
 

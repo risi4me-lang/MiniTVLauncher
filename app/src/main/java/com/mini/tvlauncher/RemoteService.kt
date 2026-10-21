@@ -139,6 +139,9 @@ class RemoteService : Service(), RemoteHost {
         val keyName = name.lowercase(Locale.US)
         val acc = RemoteAccessibilityService.instance
 
+        val mainActivity = MainActivity.activeInstance?.get()
+        mainActivity?.resetIdleTimer()
+
         if (keyName == "back") {
             if (acc == null) return "accessibility_off"
             return if (acc.performBack()) null else "back_failed"
@@ -158,7 +161,6 @@ class RemoteService : Service(), RemoteHost {
         }
 
         // Route D-pad keys (up, down, left, right, ok) to MainActivity via WeakReference if in foreground
-        val mainActivity = MainActivity.activeInstance?.get()
         if (mainActivity != null) {
             val code = when (keyName) {
                 "up" -> KeyEvent.KEYCODE_DPAD_UP
@@ -232,6 +234,7 @@ class RemoteService : Service(), RemoteHost {
 
     override fun typeText(text: String, action: String): Boolean {
         val main = MainActivity.activeInstance?.get()
+        main?.resetIdleTimer()
         if (main != null && main.isSearchPanelOpen()) {
             main.handleLiveTypeFromRemote(text, action)
             return true
@@ -241,6 +244,7 @@ class RemoteService : Service(), RemoteHost {
 
     override fun triggerVoice(): String? {
         val main = MainActivity.activeInstance?.get()
+        main?.resetIdleTimer()
         if (main != null) {
             return main.triggerVoiceSearch()
         }
@@ -263,6 +267,8 @@ class RemoteService : Service(), RemoteHost {
     }
 
     override fun openLink(url: String): String? {
+        val main = MainActivity.activeInstance?.get()
+        main?.resetIdleTimer()
         val trimmed = url.trim()
         if (trimmed.length > 2000) return "Link is too long (max 2000 characters)"
         if (!trimmed.startsWith("http://", ignoreCase = true) && !trimmed.startsWith("https://", ignoreCase = true)) {
@@ -287,6 +293,8 @@ class RemoteService : Service(), RemoteHost {
     }
 
     override fun performPower(): String? {
+        val main = MainActivity.activeInstance?.get()
+        main?.resetIdleTimer()
         val acc = RemoteAccessibilityService.instance
         if (acc == null) {
             return "Accessibility service not enabled on TV"
@@ -298,6 +306,7 @@ class RemoteService : Service(), RemoteHost {
     override fun renameApp(pkg: String, newName: String): Boolean {
         AppUtils.renameApp(prefs, pkg, newName)
         val main = MainActivity.activeInstance?.get()
+        main?.resetIdleTimer()
         main?.runOnUiThread { main.reloadAppsAndRefresh() }
         return true
     }
@@ -305,6 +314,7 @@ class RemoteService : Service(), RemoteHost {
     override fun setUserCategory(pkg: String, category: String): Boolean {
         AppUtils.setUserCategory(prefs, pkg, category)
         val main = MainActivity.activeInstance?.get()
+        main?.resetIdleTimer()
         main?.runOnUiThread { main.reloadAppsAndRefresh() }
         return true
     }
@@ -313,6 +323,7 @@ class RemoteService : Service(), RemoteHost {
         val ok = AppUtils.downscaleAndSaveCardImage(filesDir, pkg, bytes)
         if (ok) {
             val main = MainActivity.activeInstance?.get()
+            main?.resetIdleTimer()
             main?.runOnUiThread { main.reloadAppsAndRefresh() }
         }
         return ok
@@ -321,6 +332,7 @@ class RemoteService : Service(), RemoteHost {
     override fun resetCardImage(pkg: String): Boolean {
         val ok = AppUtils.resetCardImage(filesDir, pkg)
         val main = MainActivity.activeInstance?.get()
+        main?.resetIdleTimer()
         main?.runOnUiThread { main.reloadAppsAndRefresh() }
         return ok
     }
@@ -328,6 +340,7 @@ class RemoteService : Service(), RemoteHost {
     override fun resetUsageStats(): Boolean {
         AppUtils.resetLaunchCounts(prefs)
         val main = MainActivity.activeInstance?.get()
+        main?.resetIdleTimer()
         main?.runOnUiThread { main.reloadAppsAndRefresh() }
         return true
     }
@@ -335,6 +348,7 @@ class RemoteService : Service(), RemoteHost {
     override fun launchPkg(pkg: String): Boolean {
         AppUtils.incrementLaunchCount(prefs, pkg)
         val main = MainActivity.activeInstance?.get()
+        main?.resetIdleTimer()
         main?.runOnUiThread { main.reloadAppsAndRefresh() }
 
         return try {
@@ -374,6 +388,7 @@ class RemoteService : Service(), RemoteHost {
         if (ok) {
             prefs.edit().putLong("wallpaper_version", System.currentTimeMillis()).apply()
             val main = MainActivity.activeInstance?.get()
+            main?.resetIdleTimer()
             main?.runOnUiThread { main.applyWallpaper() }
         }
         return ok
@@ -387,6 +402,7 @@ class RemoteService : Service(), RemoteHost {
             .apply()
 
         val main = MainActivity.activeInstance?.get()
+        main?.resetIdleTimer()
         main?.runOnUiThread { main.applyWallpaper() }
         return true
     }
@@ -405,6 +421,7 @@ class RemoteService : Service(), RemoteHost {
             put("homeQrMode", prefs.getString("home_qr_mode", "always") ?: "always")
             put("groupByCategory", prefs.getBoolean("group_by_category", true))
             put("slideshowInterval", prefs.getInt("wallpaper_slideshow_interval", 0))
+            put("screensaverTimeout", prefs.getInt("screensaver_timeout_minutes", 0))
             put("accessibilityEnabled", RemoteAccessibilityService.isEnabled(this@RemoteService))
         }
         return json.toString()
@@ -422,8 +439,10 @@ class RemoteService : Service(), RemoteHost {
             if (json.has("homeQrMode")) editor.putString("home_qr_mode", json.getString("homeQrMode"))
             if (json.has("groupByCategory")) editor.putBoolean("group_by_category", json.getBoolean("groupByCategory"))
             if (json.has("slideshowInterval")) editor.putInt("wallpaper_slideshow_interval", json.getInt("slideshowInterval"))
+            if (json.has("screensaverTimeout")) editor.putInt("screensaver_timeout_minutes", json.getInt("screensaverTimeout"))
             editor.apply()
             val main = MainActivity.activeInstance?.get()
+            main?.resetIdleTimer()
             main?.runOnUiThread { main.applyWallpaper(); main.reloadAppsAndRefresh() }
             true
         } catch (_: Exception) {
@@ -433,6 +452,7 @@ class RemoteService : Service(), RemoteHost {
 
     override fun exchangeToken(token: String): String? {
         val launcherActivity = MainActivity.activeInstance?.get()
+        launcherActivity?.resetIdleTimer()
         return launcherActivity?.exchangeToken(token)
     }
 
@@ -450,6 +470,8 @@ class RemoteService : Service(), RemoteHost {
 
     override fun adjustVolume(action: String): Boolean {
         return try {
+            val main = MainActivity.activeInstance?.get()
+            main?.resetIdleTimer()
             val am = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return false
             val flags = AudioManager.FLAG_SHOW_UI
             when (action.lowercase(Locale.US)) {
@@ -482,7 +504,10 @@ class RemoteService : Service(), RemoteHost {
 
     override fun updateFavorite(pkg: String, pinned: Boolean): Boolean {
         val main = MainActivity.activeInstance?.get()
-        if (main != null) return main.updateFavorite(pkg, pinned)
+        if (main != null) {
+            main.resetIdleTimer()
+            return main.updateFavorite(pkg, pinned)
+        }
         return try {
             val jsonStr = prefs.getString("favorite_pkgs_json", "[]") ?: "[]"
             val list = ArrayList<String>()
@@ -511,7 +536,10 @@ class RemoteService : Service(), RemoteHost {
 
     override fun updateHidden(pkg: String, hidden: Boolean): Boolean {
         val main = MainActivity.activeInstance?.get()
-        if (main != null) return main.updateHidden(pkg, hidden)
+        if (main != null) {
+            main.resetIdleTimer()
+            return main.updateHidden(pkg, hidden)
+        }
         return try {
             val jsonStr = prefs.getString("hidden_pkgs_json", "[]") ?: "[]"
             val set = HashSet<String>()

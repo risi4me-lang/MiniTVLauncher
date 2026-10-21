@@ -676,4 +676,44 @@
             </LinearLayout>
         </ScrollView>
     </FrameLayout>
+
+    <!-- In-Launcher Screensaver Overlay Panel -->
+    <FrameLayout
+        android:id="@+id/screensaverPanel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#F5050810"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/screensaverClockContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <TextClock
+                android:id="@+id/screensaverClock"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="72sp"
+                android:fontFamily="sans-serif-thin"
+                android:format12Hour="h:mm a"
+                android:format24Hour="HH:mm" />
+
+            <TextClock
+                android:id="@+id/screensaverDate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#99AABB"
+                android:textSize="18sp"
+                android:fontFamily="sans-serif-light"
+                android:format12Hour="EEEE, MMMM d"
+                android:format24Hour="EEEE, MMMM d" />
+        </LinearLayout>
+    </FrameLayout>
 </FrameLayout>
