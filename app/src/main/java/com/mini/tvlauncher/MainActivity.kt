@@ -2,7 +2,6 @@ package com.mini.tvlauncher
 
 import android.app.Activity
 import android.app.AlertDialog
-import android.app.SearchManager
 import android.app.role.RoleManager
 import android.content.*
 import android.content.pm.ApplicationInfo
@@ -10,77 +9,28 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.BitmapFactory
 import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
-import android.graphics.drawable.GradientDrawable
 import android.media.AudioManager
-import android.net.ConnectivityManager
-import android.net.Network
-import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
-import android.text.Editable
-import android.text.TextWatcher
 import android.view.*
 import android.view.animation.DecelerateInterpolator
 import android.widget.*
 import androidx.core.widget.NestedScrollView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.qrcode.QRCodeWriter
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.lang.ref.WeakReference
-import java.net.HttpURLConnection
-import java.net.Inet4Address
-import java.net.NetworkInterface
-import java.net.URL
-import java.security.MessageDigest
-import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.concurrent.thread
-
-data class AppEntry(
-    val defaultLabel: String,
-    val label: String,
-    val pkg: String,
-    val intent: Intent,
-    val banner: Drawable?,
-    val icon: Drawable?,
-    val averageColor: Int,
-    val launchCount: Int = 0,
-    val hasCustomImage: Boolean = false,
-    val appInfo: ApplicationInfo? = null
-)
-
-data class ToolTile(
-    val id: String,
-    val label: String,
-    val iconRes: Int,
-    val intent: Intent
-)
-
-data class CategoryRowItem(
-    val title: String,
-    val apps: List<AppEntry>
-)
-
-private data class ShortcutCandidate(
-    val id: String,
-    val label: String,
-    val iconRes: Int,
-    val averageColor: Int,
-    val candidateIntents: List<Intent>
-)
 
 class MainActivity : Activity() {
 
@@ -93,8 +43,6 @@ class MainActivity : Activity() {
     @Volatile private var allInstalledApps: List<AppEntry> = emptyList()
     @Volatile private var currentVisibleApps: List<AppEntry> = emptyList()
 
-    private lateinit var wallpaper: ImageView
-    private lateinit var wallpaperNext: ImageView
     private lateinit var mainScrollView: NestedScrollView
     private lateinit var rowsContainer: RecyclerView
     private lateinit var toolsRow: RecyclerView
@@ -103,10 +51,12 @@ class MainActivity : Activity() {
         setMaxRecycledViews(0, 20)
     }
 
-    private lateinit var searchPillBtn: TextView
-    private lateinit var searchPanel: FrameLayout
-    private lateinit var searchInput: EditText
-    private lateinit var searchAppResults: LinearLayout
+    private lateinit var networkIndicator: NetworkIndicator
+    private lateinit var settingsApplier: SettingsApplier
+    private lateinit var searchPanelManager: SearchPanelManager
+    private lateinit var qrPairingManager: QrPairingManager
+    private lateinit var wallpaperManager: WallpaperManager
+    private lateinit var categoryRowsManager: CategoryRowsManager
 
     private lateinit var keyTesterPanel: FrameLayout
     private lateinit var keyTesterCodeText: TextView
@@ -116,50 +66,8 @@ class MainActivity : Activity() {
     private lateinit var screensaverPanel: FrameLayout
     private lateinit var screensaverClockContainer: LinearLayout
 
-    private lateinit var weatherContainer: LinearLayout
-    private lateinit var weatherIcon: ImageView
-    private lateinit var weatherText: TextView
-
-    private lateinit var homeQrCard: LinearLayout
-    private lateinit var homeQrImageView: ImageView
-    private lateinit var homeQrCaption: TextView
-    private lateinit var homeQrOfflineText: TextView
-    private var homeQrBitmap: Bitmap? = null
-
-    private val qrHandler = Handler(Looper.getMainLooper())
-    private val qrRefreshRunnable = object : Runnable {
-        override fun run() {
-            refreshHomeQrCode()
-            qrHandler.postDelayed(this, 90_000L)
-        }
-    }
-
-    private val slideshowHandler = Handler(Looper.getMainLooper())
-    private var slideshowIndex = 0
-    private var currentBmp: Bitmap? = null
-
-    private val slideshowRunnable = object : Runnable {
-        override fun run() {
-            performSlideshowTransition()
-            val minutes = prefs.getInt("wallpaper_slideshow_interval", 0)
-            if (minutes > 0) {
-                slideshowHandler.postDelayed(this, minutes * 60 * 1000L)
-            }
-        }
-    }
-
-    private val weatherHandler = Handler(Looper.getMainLooper())
-    private val weatherRunnable = object : Runnable {
-        override fun run() {
-            fetchWeatherBackground()
-            weatherHandler.postDelayed(this, 30 * 60 * 1000L)
-        }
-    }
-
     private val idleHandler = Handler(Looper.getMainLooper())
-    private val idleRunnable = Runnable {
-        showScreensaver()
-    }
+    private val idleRunnable = Runnable { showScreensaver() }
 
     private val driftHandler = Handler(Looper.getMainLooper())
     private val driftRunnable = object : Runnable {
@@ -178,40 +86,17 @@ class MainActivity : Activity() {
 
     private val prefChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == "user_name" || key == "clock_is_12h" || key == "clock_show_seconds" || key == "clock_show_date" || key == "favorite_pkgs_json" || key == "hidden_pkgs_json" || key == "app_rename_map" || key == "app_category_map" || key == "group_by_category" || key == "app_launch_counts" || key == "app_sort_mode") {
-            runOnUiThread { applySettings(); reloadAppsAndRefresh() }
+            runOnUiThread { settingsApplier.applySettings(); reloadAppsAndRefresh() }
         } else if (key == "preset" || key == "custom" || key == "wallpaper_version" || key == "wallpaper_slideshow_interval") {
-            runOnUiThread { applyWallpaper() }
+            runOnUiThread { wallpaperManager.applyWallpaper() }
         } else if (key == "home_qr_mode" || key == "paired_devices_json") {
-            runOnUiThread { updateHomeQrVisibility(); refreshToolsRow() }
+            runOnUiThread { qrPairingManager.updateHomeQrVisibility(); refreshToolsRow() }
         } else if (key == "screensaver_timeout_minutes") {
             runOnUiThread { resetIdleTimer() }
         } else if (key == "weather_city" || key == "weather_unit") {
-            runOnUiThread { fetchWeatherBackground() }
+            runOnUiThread { settingsApplier.fetchWeatherBackground() }
         }
     }
-
-    @Volatile private var activeToken: String? = null
-    @Volatile private var activeTokenExpiry: Long = 0L
-    private var currentQrBitmap: Bitmap? = null
-
-    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(network: Network) { updateNetworkStatus(); refreshHomeQrCode(); fetchWeatherBackground() }
-        override fun onLost(network: Network) { updateNetworkStatus(); refreshHomeQrCode(); fetchWeatherBackground() }
-        override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) { updateNetworkStatus() }
-    }
-
-    private val presets = listOf(
-        "Dark gradient" to intArrayOf(0xFF0B0F1A.toInt(), 0xFF1B2440.toInt()),
-        "Charcoal" to intArrayOf(0xFF101010.toInt(), 0xFF2A2A2A.toInt()),
-        "Deep teal" to intArrayOf(0xFF041A1F.toInt(), 0xFF0E4B52.toInt()),
-        "Midnight blue" to intArrayOf(0xFF030A16.toInt(), 0xFF122240.toInt()),
-        "Dark violet" to intArrayOf(0xFF12031A.toInt(), 0xFF320E42.toInt()),
-        "Obsidian emerald" to intArrayOf(0xFF03160C.toInt(), 0xFF0E3821.toInt()),
-        "Ember dark" to intArrayOf(0xFF1A0A03.toInt(), 0xFF421D0E.toInt()),
-        "Cosmic indigo" to intArrayOf(0xFF08031A.toInt(), 0xFF210E42.toInt()),
-        "Slate graphite" to intArrayOf(0xFF13171F.toInt(), 0xFF2D3545.toInt()),
-        "Deep wine" to intArrayOf(0xFF1A030A.toInt(), 0xFF420E1C.toInt())
-    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -219,19 +104,9 @@ class MainActivity : Activity() {
 
         prefs.registerOnSharedPreferenceChangeListener(prefChangeListener)
 
-        wallpaper = findViewById(R.id.wallpaper)
-        wallpaperNext = findViewById(R.id.wallpaperNext)
         mainScrollView = findViewById(R.id.mainScrollView)
         toolsRow = findViewById(R.id.toolsRow)
         rowsContainer = findViewById(R.id.rowsContainer)
-
-        weatherContainer = findViewById(R.id.weatherContainer)
-        weatherIcon = findViewById(R.id.weatherIcon)
-        weatherText = findViewById(R.id.weatherText)
-
-        screensaverPanel = findViewById(R.id.screensaverPanel)
-        screensaverClockContainer = findViewById(R.id.screensaverClockContainer)
-        screensaverPanel.setOnClickListener { dismissScreensaver() }
 
         rowsContainer.layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
         rowsContainer.isNestedScrollingEnabled = false
@@ -258,19 +133,62 @@ class MainActivity : Activity() {
             }
         }
 
-        searchPillBtn = findViewById(R.id.searchPillBtn)
-        searchPanel = findViewById(R.id.searchPanel)
-        searchInput = findViewById(R.id.searchInput)
-        searchAppResults = findViewById(R.id.searchAppResults)
+        wallpaperManager = WallpaperManager(
+            this, prefs, filesDir,
+            findViewById(R.id.wallpaper),
+            findViewById(R.id.wallpaperNext)
+        )
 
-        searchPillBtn.setOnClickListener { openSearchPanel() }
-        searchPillBtn.setOnFocusChangeListener { v, focused ->
-            v.animate().scaleX(if (focused) 1.08f else 1.0f).scaleY(if (focused) 1.08f else 1.0f).setDuration(160).start()
+        settingsApplier = SettingsApplier(
+            this, prefs,
+            findViewById(R.id.greeting),
+            findViewById(R.id.clock),
+            findViewById(R.id.date),
+            findViewById(R.id.weatherContainer),
+            findViewById(R.id.weatherIcon),
+            findViewById(R.id.weatherText)
+        )
+
+        networkIndicator = NetworkIndicator(this, findViewById(R.id.netIcon)) {
+            qrPairingManager.refreshHomeQrCode()
+            settingsApplier.fetchWeatherBackground()
         }
 
-        findViewById<View>(R.id.closeSearchPanelBtn).setOnClickListener { closeSearchPanel() }
-        findViewById<View>(R.id.searchWebBtn).setOnClickListener { executeWebSearch(searchInput.text.toString()) }
-        findViewById<View>(R.id.searchYoutubeBtn).setOnClickListener { executeYoutubeSearch(searchInput.text.toString()) }
+        searchPanelManager = SearchPanelManager(
+            this,
+            findViewById(R.id.searchPillBtn),
+            findViewById(R.id.searchPanel),
+            findViewById(R.id.searchInput),
+            findViewById(R.id.searchAppResults),
+            findViewById(R.id.searchWebBtn),
+            findViewById(R.id.searchYoutubeBtn),
+            findViewById(R.id.closeSearchPanelBtn),
+            getInstalledApps = { allInstalledApps },
+            getHiddenPkgs = { getHiddenPkgs() },
+            onAppClick = { launch(it) }
+        )
+
+        qrPairingManager = QrPairingManager(
+            this, prefs,
+            findViewById(R.id.homeQrCard),
+            findViewById(R.id.homeQrImageView),
+            findViewById(R.id.homeQrCaption),
+            findViewById(R.id.homeQrOfflineText),
+            findViewById(R.id.pairingPanel),
+            findViewById(R.id.pairingInfo),
+            findViewById(R.id.qrImageView),
+            findViewById(R.id.pairedDevicesList),
+            findViewById(R.id.noDevicesText),
+            findViewById(R.id.closePanelBtn),
+            findViewById(R.id.removeAllBtn),
+            onPairedDevicesChanged = { refreshToolsRow() }
+        )
+
+        categoryRowsManager = CategoryRowsManager(
+            prefs, rowsContainer, sharedViewPool,
+            onAppClick = { launch(it) },
+            onAppLongClick = { entry, view -> showAppContextMenu(entry, view) }
+        )
 
         keyTesterPanel = findViewById(R.id.keyTesterPanel)
         keyTesterCodeText = findViewById(R.id.keyTesterCodeText)
@@ -278,38 +196,17 @@ class MainActivity : Activity() {
         keyTesterNameText = findViewById(R.id.keyTesterNameText)
         findViewById<View>(R.id.closeKeyTesterPanelBtn).setOnClickListener { closeKeyTesterPanel() }
 
-        homeQrCard = findViewById(R.id.homeQrCard)
-        homeQrImageView = findViewById(R.id.homeQrImageView)
-        homeQrCaption = findViewById(R.id.homeQrCaption)
-        homeQrOfflineText = findViewById(R.id.homeQrOfflineText)
+        screensaverPanel = findViewById(R.id.screensaverPanel)
+        screensaverClockContainer = findViewById(R.id.screensaverClockContainer)
+        screensaverPanel.setOnClickListener { dismissScreensaver() }
 
-        homeQrCard.setOnClickListener { openPairingPanel() }
-        homeQrCard.setOnFocusChangeListener { v, focused ->
-            v.animate().scaleX(if (focused) 1.08f else 1.0f).scaleY(if (focused) 1.08f else 1.0f).setDuration(160).start()
-        }
-
-        // Setup Tools Row
         toolsRow.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         refreshToolsRow()
 
         val wallpaperBtn = findViewById<View>(R.id.wallpaperBtn)
-        wallpaperBtn.setOnClickListener { chooseWallpaper() }
+        wallpaperBtn.setOnClickListener { wallpaperManager.chooseWallpaper() }
         wallpaperBtn.setOnFocusChangeListener { v, focused ->
             v.animate().scaleX(if (focused) 1.08f else 1.0f).scaleY(if (focused) 1.08f else 1.0f).setDuration(160).start()
-        }
-
-        findViewById<View>(R.id.closePanelBtn).apply {
-            setOnClickListener { closePairingPanel() }
-            setOnFocusChangeListener { v, focused ->
-                v.animate().scaleX(if (focused) 1.08f else 1.0f).scaleY(if (focused) 1.08f else 1.0f).setDuration(160).start()
-            }
-        }
-
-        findViewById<View>(R.id.removeAllBtn).apply {
-            setOnClickListener { removeAllPairedDevices() }
-            setOnFocusChangeListener { v, focused ->
-                v.animate().scaleX(if (focused) 1.08f else 1.0f).scaleY(if (focused) 1.08f else 1.0f).setDuration(160).start()
-            }
         }
 
         findViewById<View>(R.id.closeHiddenPanelBtn).apply {
@@ -326,110 +223,19 @@ class MainActivity : Activity() {
             }
         }
 
-        applySettings()
-        applyWallpaper()
+        settingsApplier.applySettings()
+        wallpaperManager.applyWallpaper()
         loadApps()
         startRemoteService()
         requestNotificationPermissionIfNeeded()
     }
 
-    // ---- Weather Polling & Display ----
-    private fun fetchWeatherBackground() {
-        val cityName = prefs.getString("weather_city", "")?.trim() ?: ""
-        val unit = prefs.getString("weather_unit", "c") ?: "c"
-
-        if (cityName.isEmpty()) {
-            weatherContainer.visibility = View.GONE
-            return
+    fun launch(e: AppEntry) {
+        AppUtils.incrementLaunchCount(prefs, e.pkg)
+        reloadAppsAndRefresh()
+        try { startActivity(e.intent) } catch (_: Exception) {
+            Toast.makeText(this, "Can't open ${e.label}", Toast.LENGTH_SHORT).show()
         }
-
-        // Show cached result first if available
-        showCachedWeatherOrHide(cityName, unit)
-
-        thread {
-            try {
-                // 1. Geocode search
-                val geoUrl = "https://geocoding-api.open-meteo.com/v1/search?name=" + Uri.encode(cityName) + "&count=1"
-                val geoJson = httpGet(geoUrl) ?: throw Exception("Geocode network failed")
-                val geoObj = JSONObject(geoJson)
-                val results = geoObj.optJSONArray("results") ?: throw Exception("No geocode results")
-                if (results.length() == 0) throw Exception("City not found")
-                val first = results.getJSONObject(0)
-                val lat = first.getDouble("latitude")
-                val lon = first.getDouble("longitude")
-                val matchedName = first.optString("name", cityName)
-
-                // 2. Forecast fetch
-                val unitParam = if (unit == "f") "&temperature_unit=fahrenheit" else ""
-                val forecastUrl = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current_weather=true$unitParam"
-                val forecastJson = httpGet(forecastUrl) ?: throw Exception("Forecast network failed")
-                val forecastObj = JSONObject(forecastJson)
-                val currentWeather = forecastObj.getJSONObject("current_weather")
-                val temp = currentWeather.getDouble("temperature")
-                val code = currentWeather.getInt("weathercode")
-
-                // Cache
-                prefs.edit()
-                    .putFloat("cached_weather_temp", temp.toFloat())
-                    .putInt("cached_weather_code", code)
-                    .putString("cached_weather_city", matchedName)
-                    .putString("cached_weather_unit", unit)
-                    .apply()
-
-                runOnUiThread {
-                    updateWeatherUi(temp, code, matchedName, unit)
-                }
-            } catch (_: Exception) {
-                runOnUiThread {
-                    showCachedWeatherOrHide(cityName, unit)
-                }
-            }
-        }
-    }
-
-    private fun showCachedWeatherOrHide(cityName: String, unit: String) {
-        val cachedCity = prefs.getString("cached_weather_city", "") ?: ""
-        val cachedUnit = prefs.getString("cached_weather_unit", "c") ?: "c"
-        if (cachedCity.equals(cityName, ignoreCase = true) && cachedUnit == unit && prefs.contains("cached_weather_temp")) {
-            val temp = prefs.getFloat("cached_weather_temp", 0f).toDouble()
-            val code = prefs.getInt("cached_weather_code", 0)
-            updateWeatherUi(temp, code, cachedCity, cachedUnit)
-        } else {
-            weatherContainer.visibility = View.GONE
-        }
-    }
-
-    private fun updateWeatherUi(temp: Double, code: Int, city: String, unit: String) {
-        val unitLabel = if (unit == "f") "°F" else "°C"
-        val formattedTemp = Math.round(temp).toString() + unitLabel
-        weatherText.text = "$formattedTemp  $city"
-        weatherIcon.setImageResource(getWeatherIconRes(code))
-        weatherContainer.visibility = View.VISIBLE
-    }
-
-    private fun getWeatherIconRes(code: Int): Int {
-        return when (code) {
-            0 -> R.drawable.ic_weather_sunny
-            1, 2, 3 -> R.drawable.ic_weather_cloudy
-            45, 48 -> R.drawable.ic_weather_fog
-            51, 53, 55, 61, 63, 65, 80, 81, 82 -> R.drawable.ic_weather_rain
-            71, 73, 75, 77, 85, 86 -> R.drawable.ic_weather_snow
-            95, 96, 99 -> R.drawable.ic_weather_thunder
-            else -> R.drawable.ic_weather_cloudy
-        }
-    }
-
-    private fun httpGet(urlStr: String): String? {
-        return try {
-            val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 8000
-                readTimeout = 8000
-                requestMethod = "GET"
-            }
-            if (conn.responseCode == 200) {
-                conn.inputStream.use { it.bufferedReader().readText() }
-            } else null
-        } catch (_: Exception) { null }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -521,15 +327,11 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         prefs.unregisterOnSharedPreferenceChangeListener(prefChangeListener)
-        qrHandler.removeCallbacks(qrRefreshRunnable)
-        slideshowHandler.removeCallbacks(slideshowRunnable)
-        weatherHandler.removeCallbacks(weatherRunnable)
+        qrPairingManager.stop()
+        wallpaperManager.destroy()
+        settingsApplier.stopWeatherPolling()
         idleHandler.removeCallbacks(idleRunnable)
         driftHandler.removeCallbacks(driftRunnable)
-        homeQrBitmap?.recycle()
-        homeQrBitmap = null
-        currentBmp?.recycle()
-        currentBmp = null
         if (activeInstance?.get() == this) {
             activeInstance = null
         }
@@ -565,123 +367,11 @@ class MainActivity : Activity() {
         }
     }
 
-    // ---- Search Panel Methods ----
-    fun isSearchPanelOpen(): Boolean = searchPanel.visibility == View.VISIBLE
-
-    private fun openSearchPanel() {
-        searchPanel.visibility = View.VISIBLE
-        searchInput.requestFocus()
-        filterSearchApps(searchInput.text.toString())
-
-        searchInput.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                filterSearchApps(s?.toString() ?: "")
-            }
-            override fun afterTextChanged(s: Editable?) {}
-        })
-    }
-
-    private fun closeSearchPanel() {
-        searchPanel.visibility = View.GONE
-        searchInput.setText("")
-        searchPillBtn.requestFocus()
-    }
+    // ---- Delegated Search & Pairing Methods ----
+    fun isSearchPanelOpen(): Boolean = searchPanelManager.isOpen()
 
     fun handleLiveTypeFromRemote(text: String, action: String) {
-        runOnUiThread {
-            if (action == "clear") {
-                searchInput.setText("")
-            } else {
-                searchInput.setText(text)
-                if (text.isNotEmpty()) searchInput.setSelection(text.length)
-            }
-
-            if (action == "enter") {
-                val query = searchInput.text.toString().trim()
-                val matches = allInstalledApps.filter { it.label.contains(query, ignoreCase = true) }
-                if (matches.isNotEmpty()) {
-                    launch(matches[0])
-                    closeSearchPanel()
-                } else {
-                    executeWebSearch(query)
-                }
-            }
-        }
-    }
-
-    private fun filterSearchApps(query: String) {
-        searchAppResults.removeAllViews()
-        val q = query.trim().lowercase(Locale.US)
-        val hiddenPkgs = getHiddenPkgs()
-        val matches = if (q.isEmpty()) emptyList() else allInstalledApps.filter {
-            !hiddenPkgs.contains(it.pkg) && it.label.lowercase(Locale.US).contains(q)
-        }.take(5)
-
-        val inflater = LayoutInflater.from(this)
-        for (app in matches) {
-            val item = inflater.inflate(R.layout.item_hidden_app, searchAppResults, false)
-            item.findViewById<TextView>(R.id.appName).text = app.label
-            val btn = item.findViewById<TextView>(R.id.unhideBtn)
-            btn.text = "Open"
-            btn.setOnClickListener {
-                launch(app)
-                closeSearchPanel()
-            }
-            btn.setOnFocusChangeListener { v, focused ->
-                v.animate().scaleX(if (focused) 1.08f else 1.0f).scaleY(if (focused) 1.08f else 1.0f).setDuration(160).start()
-            }
-            searchAppResults.addView(item)
-        }
-    }
-
-    private fun executeWebSearch(query: String) {
-        val q = query.trim()
-        if (q.isEmpty()) {
-            Toast.makeText(this, "Type search query first", Toast.LENGTH_SHORT).show()
-            return
-        }
-        try {
-            val intent = Intent(Intent.ACTION_WEB_SEARCH).apply {
-                putExtra(SearchManager.QUERY, q)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            startActivity(intent)
-        } catch (_: Exception) {
-            try {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=" + Uri.encode(q))).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                startActivity(intent)
-            } catch (_: Exception) {
-                Toast.makeText(this, "Cannot open web browser", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    private fun executeYoutubeSearch(query: String) {
-        val q = query.trim()
-        if (q.isEmpty()) {
-            Toast.makeText(this, "Type search query first", Toast.LENGTH_SHORT).show()
-            return
-        }
-        try {
-            val intent = Intent(Intent.ACTION_SEARCH).apply {
-                setPackage("com.google.android.youtube.tv")
-                putExtra(SearchManager.QUERY, q)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            startActivity(intent)
-        } catch (_: Exception) {
-            try {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/results?search_query=" + Uri.encode(q))).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                startActivity(intent)
-            } catch (_: Exception) {
-                Toast.makeText(this, "Cannot search YouTube", Toast.LENGTH_SHORT).show()
-            }
-        }
+        searchPanelManager.handleLiveTypeFromRemote(text, action)
     }
 
     fun triggerVoiceSearch(): String? {
@@ -711,7 +401,7 @@ class MainActivity : Activity() {
             when (tile.id) {
                 "hidden_apps" -> openHiddenAppsPanel()
                 "power" -> handlePowerClick()
-                "pair_phone" -> openPairingPanel()
+                "pair_phone" -> qrPairingManager.openPairingPanel()
                 "default_home" -> openDefaultHomeChooser()
                 "key_tester" -> openKeyTesterPanel()
                 else -> {
@@ -724,46 +414,6 @@ class MainActivity : Activity() {
                 }
             }
         }
-    }
-
-    private fun refreshHomeQrCode() {
-        val token = generatePairingToken()
-        val ip = localIp()
-        val port = RemoteService.serverPort.takeIf { it != 0 } ?: 8080
-
-        updateHomeQrVisibility()
-
-        if (ip == null) {
-            homeQrImageView.visibility = View.GONE
-            homeQrCaption.visibility = View.GONE
-            homeQrOfflineText.visibility = View.VISIBLE
-        } else {
-            homeQrImageView.visibility = View.VISIBLE
-            homeQrCaption.visibility = View.VISIBLE
-            homeQrOfflineText.visibility = View.GONE
-
-            val url = "http://$ip:$port/?t=$token"
-            val newBmp = generateQrBitmap(url, 240)
-            if (newBmp != null) {
-                val oldBmp = homeQrBitmap
-                homeQrBitmap = newBmp
-                homeQrImageView.setImageBitmap(newBmp)
-                oldBmp?.recycle()
-            }
-        }
-    }
-
-    private fun updateHomeQrVisibility() {
-        val mode = prefs.getString("home_qr_mode", "always") ?: "always"
-        val hasPaired = getPairedDevicesList().isNotEmpty()
-
-        val isVisible = when (mode) {
-            "off" -> false
-            "until_paired" -> !hasPaired
-            else -> true
-        }
-
-        homeQrCard.visibility = if (isVisible) View.VISIBLE else View.GONE
     }
 
     fun reloadAppsAndRefresh() {
@@ -862,7 +512,7 @@ class MainActivity : Activity() {
         return true
     }
 
-    private fun getHiddenPkgs(): Set<String> {
+    fun getHiddenPkgs(): Set<String> {
         val jsonStr = prefs.getString("hidden_pkgs_json", "[]") ?: "[]"
         return try {
             val arr = JSONArray(jsonStr)
@@ -904,47 +554,7 @@ class MainActivity : Activity() {
     }
 
     private fun refreshAppLists() {
-        val hiddenPkgs = getHiddenPkgs()
-        val visibleApps = allInstalledApps.filter { !hiddenPkgs.contains(it.pkg) }
-        currentVisibleApps = visibleApps
-
-        val favPkgs = getFavoritePkgs()
-        val favApps = favPkgs.mapNotNull { pkg -> visibleApps.firstOrNull { it.pkg == pkg } }
-
-        val groupByCategory = prefs.getBoolean("group_by_category", true)
-        val rowItems = ArrayList<CategoryRowItem>()
-
-        if (groupByCategory) {
-            // Categorized Mode: Favorites -> Entertainment -> Games -> Productivity & Tools -> Others
-            if (favApps.isNotEmpty()) {
-                rowItems.add(CategoryRowItem(AppUtils.CAT_FAVORITES, favApps))
-            }
-
-            val nonFavVisible = visibleApps.filter { !favPkgs.contains(it.pkg) }
-
-            val entApps = nonFavVisible.filter { AppUtils.getAppCategory(it, prefs) == AppUtils.CAT_ENTERTAINMENT }
-            if (entApps.isNotEmpty()) rowItems.add(CategoryRowItem(AppUtils.CAT_ENTERTAINMENT, entApps))
-
-            val gameApps = nonFavVisible.filter { AppUtils.getAppCategory(it, prefs) == AppUtils.CAT_GAMES }
-            if (gameApps.isNotEmpty()) rowItems.add(CategoryRowItem(AppUtils.CAT_GAMES, gameApps))
-
-            val prodApps = nonFavVisible.filter { AppUtils.getAppCategory(it, prefs) == AppUtils.CAT_PRODUCTIVITY }
-            if (prodApps.isNotEmpty()) rowItems.add(CategoryRowItem(AppUtils.CAT_PRODUCTIVITY, prodApps))
-
-            val otherApps = nonFavVisible.filter { AppUtils.getAppCategory(it, prefs) == AppUtils.CAT_OTHERS }
-            if (otherApps.isNotEmpty()) rowItems.add(CategoryRowItem(AppUtils.CAT_OTHERS, otherApps))
-        } else {
-            // Single A-Z / Most used row
-            if (favApps.isNotEmpty()) {
-                rowItems.add(CategoryRowItem(AppUtils.CAT_FAVORITES, favApps))
-            }
-            val remainingApps = visibleApps.filter { !favPkgs.contains(it.pkg) }
-            if (remainingApps.isNotEmpty()) {
-                rowItems.add(CategoryRowItem("Apps", remainingApps))
-            }
-        }
-
-        rowsContainer.adapter = CategoryRowAdapter(rowItems, sharedViewPool, onAppClick = { launch(it) }, onAppLongClick = { entry, view -> showAppContextMenu(entry, view) })
+        categoryRowsManager.refreshAppLists(allInstalledApps, ::getFavoritePkgs, ::getHiddenPkgs)
         refreshHiddenAppsUi()
     }
 
@@ -1120,38 +730,23 @@ class MainActivity : Activity() {
             } catch (_: Exception) {}
         }
 
-        // 1. Power
         result.add(ToolTile("power", "Power", R.drawable.ic_tool_power, Intent()))
-
-        // 2. Default Home Chooser
         result.add(ToolTile("default_home", "Default Home", R.drawable.ic_tool_launcher, Intent()))
-
-        // 3. Remote Key Tester
         result.add(ToolTile("key_tester", "Key Tester", R.drawable.ic_tool_settings, Intent()))
 
-        // 4. Settings
         checkAndAdd("settings", "Settings", R.drawable.ic_tool_settings, Intent(Settings.ACTION_SETTINGS))
-
-        // 5. Wi-Fi
         checkAndAdd("wifi", "Wi-Fi", R.drawable.ic_tool_wifi, Intent(Settings.ACTION_WIFI_SETTINGS))
-
-        // 6. Bluetooth (Pair Speaker)
         checkAndAdd("bluetooth", "Pair Speaker", R.drawable.ic_tool_bluetooth, Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
-
-        // 7. Display
         checkAndAdd("display", "Display", R.drawable.ic_tool_display, Intent(Settings.ACTION_DISPLAY_SETTINGS))
 
-        // 8. Pair Phone (If Home QR tile is hidden)
         val mode = prefs.getString("home_qr_mode", "always") ?: "always"
-        val hasPaired = getPairedDevicesList().isNotEmpty()
+        val hasPaired = qrPairingManager.getPairedDevicesList().isNotEmpty()
         if (mode == "off" || (mode == "until_paired" && hasPaired)) {
             result.add(ToolTile("pair_phone", "Pair Phone", R.drawable.ic_tool_wifi, Intent()))
         }
 
-        // 9. Hidden Apps
         result.add(ToolTile("hidden_apps", "Hidden Apps", R.drawable.ic_tool_hidden, Intent()))
 
-        // 10. Original Launcher (Fallback to Settings > Apps)
         val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         @Suppress("DEPRECATION")
         val homeMatches = pm.queryIntentActivities(homeIntent, 0)
@@ -1168,313 +763,6 @@ class MainActivity : Activity() {
         }
 
         return result
-    }
-
-    private fun updateNetworkStatus() {
-        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
-        val iconView = findViewById<ImageView>(R.id.netIcon) ?: return
-        val activeNetwork = cm.activeNetwork
-        val caps = if (activeNetwork != null) cm.getNetworkCapabilities(activeNetwork) else null
-
-        val resId = when {
-            caps == null -> R.drawable.ic_net_offline
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> R.drawable.ic_net_wifi
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> R.drawable.ic_net_ethernet
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> R.drawable.ic_net_wifi
-            else -> R.drawable.ic_net_offline
-        }
-
-        runOnUiThread {
-            iconView.setImageResource(resId)
-        }
-    }
-
-    private fun applySettings() {
-        val userName = prefs.getString("user_name", "")?.trim() ?: ""
-        val is12h = prefs.getBoolean("clock_is_12h", true)
-        val showSeconds = prefs.getBoolean("clock_show_seconds", false)
-        val showDate = prefs.getBoolean("clock_show_date", true)
-
-        updateGreeting(userName)
-
-        val clock = findViewById<TextClock>(R.id.clock)
-        val pattern = if (is12h) {
-            if (showSeconds) "h:mm:ss a" else "h:mm a"
-        } else {
-            if (showSeconds) "HH:mm:ss" else "HH:mm"
-        }
-        clock.format12Hour = pattern
-        clock.format24Hour = pattern
-
-        val date = findViewById<TextClock>(R.id.date)
-        date.visibility = if (showDate) View.VISIBLE else View.GONE
-    }
-
-    private fun updateGreeting(userName: String = prefs.getString("user_name", "")?.trim() ?: "") {
-        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-        val timeGreeting = when (hour) {
-            in 4..11 -> "Good morning"
-            in 12..16 -> "Good afternoon"
-            in 17..21 -> "Good evening"
-            else -> "Good night"
-        }
-        val text = if (userName.isNotEmpty()) "$timeGreeting, $userName" else timeGreeting
-        findViewById<TextView>(R.id.greeting).text = text
-    }
-
-    // ---- Pairing Panel & QR Code ----
-    private fun openPairingPanel() {
-        val token = generatePairingToken()
-        val ip = localIp() ?: "127.0.0.1"
-        val port = RemoteService.serverPort.takeIf { it != 0 } ?: 8080
-        val url = "http://$ip:$port/?t=$token"
-
-        findViewById<TextView>(R.id.pairingInfo).text = "Scan QR code or open in phone browser:\nhttp://$ip:$port   PIN: ${pin()}"
-
-        currentQrBitmap?.recycle()
-        currentQrBitmap = generateQrBitmap(url, 300)
-        findViewById<ImageView>(R.id.qrImageView).setImageBitmap(currentQrBitmap)
-
-        refreshPairedDevicesUi()
-        val panel = findViewById<View>(R.id.pairingPanel)
-        panel.visibility = View.VISIBLE
-        findViewById<View>(R.id.closePanelBtn).requestFocus()
-    }
-
-    private fun closePairingPanel() {
-        activeToken = null
-        currentQrBitmap?.recycle()
-        currentQrBitmap = null
-        findViewById<ImageView>(R.id.qrImageView).setImageBitmap(null)
-        findViewById<View>(R.id.pairingPanel).visibility = View.GONE
-        refreshHomeQrCode()
-    }
-
-    private fun generatePairingToken(): String {
-        val token = UUID.randomUUID().toString().replace("-", "")
-        activeToken = token
-        activeTokenExpiry = System.currentTimeMillis() + 120_000L // 2 minutes
-        return token
-    }
-
-    fun exchangeToken(token: String): String? {
-        val current = System.currentTimeMillis()
-        val validToken = activeToken
-        if (validToken != null && validToken == token && current <= activeTokenExpiry) {
-            activeToken = null // Single-use: consume immediately
-            val deviceKey = UUID.randomUUID().toString()
-            val hash = hashKey(deviceKey)
-            val name = "Phone (" + SimpleDateFormat("MMM d, HH:mm", Locale.US).format(Date()) + ")"
-            addPairedDevice(hash, name)
-            runOnUiThread { refreshHomeQrCode() }
-            return deviceKey
-        }
-        return null
-    }
-
-    private fun hashKey(key: String): String {
-        val bytes = MessageDigest.getInstance("SHA-256").digest(key.toByteArray(Charsets.UTF_8))
-        return bytes.joinToString("") { "%02x".format(it) }
-    }
-
-    private fun getPairedDevicesList(): List<JSONObject> {
-        val jsonStr = prefs.getString("paired_devices_json", "[]") ?: "[]"
-        return try {
-            val arr = JSONArray(jsonStr)
-            val list = ArrayList<JSONObject>()
-            for (i in 0 until arr.length()) {
-                list.add(arr.getJSONObject(i))
-            }
-            list
-        } catch (_: Exception) {
-            emptyList()
-        }
-    }
-
-    private fun savePairedDevicesList(list: List<JSONObject>) {
-        val arr = JSONArray()
-        list.forEach { arr.put(it) }
-        prefs.edit().putString("paired_devices_json", arr.toString()).apply()
-        runOnUiThread {
-            refreshPairedDevicesUi()
-            updateHomeQrVisibility()
-            refreshToolsRow()
-        }
-    }
-
-    private fun addPairedDevice(hash: String, name: String) {
-        val list = getPairedDevicesList().toMutableList()
-        val id = UUID.randomUUID().toString()
-        val obj = JSONObject().apply {
-            put("id", id)
-            put("hash", hash)
-            put("name", name)
-            put("pairedAt", System.currentTimeMillis())
-        }
-        list.add(obj)
-        savePairedDevicesList(list)
-    }
-
-    private fun removePairedDevice(id: String) {
-        val list = getPairedDevicesList().filter { it.optString("id") != id }
-        savePairedDevicesList(list)
-    }
-
-    private fun removeAllPairedDevices() {
-        savePairedDevicesList(emptyList())
-    }
-
-    private fun refreshPairedDevicesUi() {
-        val container = findViewById<LinearLayout>(R.id.pairedDevicesList)
-        val noDevicesText = findViewById<TextView>(R.id.noDevicesText)
-        container.removeAllViews()
-
-        val devices = getPairedDevicesList()
-        if (devices.isEmpty()) {
-            noDevicesText.visibility = View.VISIBLE
-        } else {
-            noDevicesText.visibility = View.GONE
-            val inflater = LayoutInflater.from(this)
-            for (dev in devices) {
-                val id = dev.optString("id")
-                val name = dev.optString("name", "Paired Phone")
-                val item = inflater.inflate(R.layout.item_paired_device, container, false)
-                item.findViewById<TextView>(R.id.deviceName).text = name
-                val removeBtn = item.findViewById<View>(R.id.removeBtn)
-                removeBtn.setOnClickListener { removePairedDevice(id) }
-                removeBtn.setOnFocusChangeListener { v, focused ->
-                    v.animate().scaleX(if (focused) 1.08f else 1.0f).scaleY(if (focused) 1.08f else 1.0f).setDuration(160).start()
-                }
-                container.addView(item)
-            }
-        }
-    }
-
-    private fun generateQrBitmap(contents: String, size: Int = 300): Bitmap? {
-        return try {
-            val writer = QRCodeWriter()
-            val bitMatrix = writer.encode(contents, BarcodeFormat.QR_CODE, size, size)
-            val w = bitMatrix.width
-            val h = bitMatrix.height
-            val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.RGB_565)
-            for (x in 0 until w) {
-                for (y in 0 until h) {
-                    bmp.setPixel(x, y, if (bitMatrix[x, y]) Color.BLACK else Color.WHITE)
-                }
-            }
-            bmp
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private fun pin(): String {
-        var p = prefs.getString("pin", null)
-        if (p == null) { p = (1000 + java.util.Random().nextInt(9000)).toString(); prefs.edit().putString("pin", p).apply() }
-        return p
-    }
-
-    private fun startRemoteService() {
-        RemoteService.startService(this)
-    }
-
-    private fun localIp(): String? = try {
-        NetworkInterface.getNetworkInterfaces().toList().flatMap { it.inetAddresses.toList() }
-            .firstOrNull { !it.isLoopbackAddress && it is Inet4Address }?.hostAddress
-    } catch (_: Exception) { null }
-
-    override fun onStart() {
-        super.onStart()
-        activeInstance = WeakReference(this)
-        applySettings()
-
-        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-        cm?.let {
-            try {
-                val request = NetworkRequest.Builder().build()
-                it.registerNetworkCallback(request, networkCallback)
-            } catch (_: Exception) {}
-        }
-        updateNetworkStatus()
-
-        val f = IntentFilter().apply {
-            addAction(Intent.ACTION_PACKAGE_ADDED); addAction(Intent.ACTION_PACKAGE_REMOVED)
-            addAction(Intent.ACTION_PACKAGE_REPLACED); addDataScheme("package")
-        }
-        registerReceiver(pkgReceiver, f)
-
-        qrHandler.removeCallbacks(qrRefreshRunnable)
-        qrHandler.post(qrRefreshRunnable)
-
-        slideshowHandler.removeCallbacks(slideshowRunnable)
-        val intervalMinutes = prefs.getInt("wallpaper_slideshow_interval", 0)
-        if (intervalMinutes > 0) {
-            slideshowHandler.postDelayed(slideshowRunnable, intervalMinutes * 60 * 1000L)
-        }
-
-        weatherHandler.removeCallbacks(weatherRunnable)
-        weatherHandler.post(weatherRunnable)
-
-        resetIdleTimer()
-    }
-
-    override fun onStop() {
-        qrHandler.removeCallbacks(qrRefreshRunnable)
-        slideshowHandler.removeCallbacks(slideshowRunnable)
-        weatherHandler.removeCallbacks(weatherRunnable)
-        idleHandler.removeCallbacks(idleRunnable)
-        driftHandler.removeCallbacks(driftRunnable)
-        if (activeInstance?.get() == this) {
-            activeInstance = null
-        }
-        super.onStop()
-        unregisterReceiver(pkgReceiver)
-        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-        cm?.let {
-            try {
-                it.unregisterNetworkCallback(networkCallback)
-            } catch (_: Exception) {}
-        }
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        if (screensaverPanel.visibility == View.VISIBLE) {
-            dismissScreensaver()
-            return
-        }
-        if (keyTesterPanel.visibility == View.VISIBLE) {
-            closeKeyTesterPanel()
-            return
-        }
-        if (searchPanel.visibility == View.VISIBLE) {
-            closeSearchPanel()
-            return
-        }
-        val hiddenPanel = findViewById<View>(R.id.hiddenAppsPanel)
-        if (hiddenPanel.visibility == View.VISIBLE) {
-            closeHiddenAppsPanel()
-            return
-        }
-        val pairingPanel = findViewById<View>(R.id.pairingPanel)
-        if (pairingPanel.visibility == View.VISIBLE) {
-            closePairingPanel()
-            return
-        }
-    }
-
-    override fun onNewIntent(intent: Intent?) {
-        super.onNewIntent(intent)
-        resetIdleTimer()
-        mainScrollView.smoothScrollTo(0, 0)
-    }
-
-    private fun launch(e: AppEntry) {
-        AppUtils.incrementLaunchCount(prefs, e.pkg)
-        reloadAppsAndRefresh()
-        try { startActivity(e.intent) } catch (_: Exception) {
-            Toast.makeText(this, "Can't open ${e.label}", Toast.LENGTH_SHORT).show()
-        }
     }
 
     private fun getShortcutCandidates(): List<ShortcutCandidate> {
@@ -1556,13 +844,93 @@ class MainActivity : Activity() {
         }
     }
 
+    fun applyWallpaper() {
+        wallpaperManager.applyWallpaper()
+    }
+
+    fun exchangeToken(token: String): String? {
+        return qrPairingManager.exchangeToken(token)
+    }
+
+    private fun startRemoteService() {
+        RemoteService.startService(this)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        activeInstance = WeakReference(this)
+        settingsApplier.applySettings()
+        networkIndicator.start()
+        qrPairingManager.start()
+        wallpaperManager.start()
+        settingsApplier.startWeatherPolling()
+
+        val f = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED); addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED); addDataScheme("package")
+        }
+        registerReceiver(pkgReceiver, f)
+
+        resetIdleTimer()
+    }
+
+    override fun onStop() {
+        qrPairingManager.stop()
+        wallpaperManager.stop()
+        settingsApplier.stopWeatherPolling()
+        networkIndicator.stop()
+        idleHandler.removeCallbacks(idleRunnable)
+        driftHandler.removeCallbacks(driftRunnable)
+        if (activeInstance?.get() == this) {
+            activeInstance = null
+        }
+        super.onStop()
+        unregisterReceiver(pkgReceiver)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (screensaverPanel.visibility == View.VISIBLE) {
+            dismissScreensaver()
+            return
+        }
+        if (keyTesterPanel.visibility == View.VISIBLE) {
+            closeKeyTesterPanel()
+            return
+        }
+        if (searchPanelManager.isOpen()) {
+            searchPanelManager.close()
+            return
+        }
+        val hiddenPanel = findViewById<View>(R.id.hiddenAppsPanel)
+        if (hiddenPanel.visibility == View.VISIBLE) {
+            closeHiddenAppsPanel()
+            return
+        }
+        if (qrPairingManager.isPairingPanelOpen()) {
+            qrPairingManager.closePairingPanel()
+            return
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        resetIdleTimer()
+        mainScrollView.smoothScrollTo(0, 0)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(req: Int, res: Int, data: Intent?) {
+        super.onActivityResult(req, res, data)
+        wallpaperManager.handleActivityResult(req, res, data)
+    }
+
     private fun loadApps() {
         thread {
             val pm = packageManager
             val seen = HashSet<String>()
             val list = ArrayList<AppEntry>()
 
-            // 1. Resolve Projector Shortcut Candidates
             for (candidate in getShortcutCandidates()) {
                 for (intent in candidate.candidateIntents) {
                     val target = resolveIntent(pm, intent)
@@ -1587,7 +955,6 @@ class MainActivity : Activity() {
                 }
             }
 
-            // 2. Resolve Installed TV & Mobile Launcher Apps
             val installedApps = ArrayList<AppEntry>()
             for (cat in listOf(Intent.CATEGORY_LEANBACK_LAUNCHER, Intent.CATEGORY_LAUNCHER)) {
                 val q = Intent(Intent.ACTION_MAIN).addCategory(cat)
@@ -1660,326 +1027,4 @@ class MainActivity : Activity() {
         drawable.draw(canvas)
         return bitmap
     }
-
-    // ---- Wallpaper & Slideshow ----
-    fun applyWallpaper() {
-        slideshowHandler.removeCallbacks(slideshowRunnable)
-        val customFiles = AppUtils.getWallpaperFiles(filesDir)
-        val isCustom = prefs.getBoolean("custom", false)
-
-        val nextBmp: Bitmap?
-        val drawable: Drawable?
-
-        if (isCustom && customFiles.isNotEmpty()) {
-            val file = customFiles[slideshowIndex.coerceIn(0, customFiles.size - 1)]
-            nextBmp = BitmapFactory.decodeFile(file.path)
-            drawable = if (nextBmp != null) BitmapDrawable(resources, nextBmp) else null
-        } else {
-            nextBmp = null
-            val idx = prefs.getInt("preset", 0).coerceIn(0, presets.size - 1)
-            val c = presets[idx].second
-            drawable = GradientDrawable(GradientDrawable.Orientation.TL_BR, c)
-        }
-
-        wallpaper.setImageDrawable(drawable)
-        wallpaperNext.animate().cancel()
-        wallpaperNext.alpha = 0f
-
-        val oldBmp = currentBmp
-        currentBmp = nextBmp
-        if (oldBmp != null && oldBmp != nextBmp && !oldBmp.isRecycled) {
-            oldBmp.recycle()
-        }
-
-        val intervalMinutes = prefs.getInt("wallpaper_slideshow_interval", 0)
-        if (intervalMinutes > 0) {
-            slideshowHandler.postDelayed(slideshowRunnable, intervalMinutes * 60 * 1000L)
-        }
-    }
-
-    private fun performSlideshowTransition() {
-        val customFiles = AppUtils.getWallpaperFiles(filesDir)
-        val isCustom = prefs.getBoolean("custom", false)
-
-        val nextBmp: Bitmap?
-        val nextDrawable: Drawable?
-
-        if (isCustom && customFiles.isNotEmpty()) {
-            slideshowIndex = (slideshowIndex + 1) % customFiles.size
-            val file = customFiles[slideshowIndex]
-            nextBmp = BitmapFactory.decodeFile(file.path)
-            nextDrawable = if (nextBmp != null) BitmapDrawable(resources, nextBmp) else null
-        } else {
-            nextBmp = null
-            slideshowIndex = (slideshowIndex + 1) % presets.size
-            val c = presets[slideshowIndex].second
-            nextDrawable = GradientDrawable(GradientDrawable.Orientation.TL_BR, c)
-        }
-
-        if (nextDrawable == null) return
-
-        wallpaperNext.setImageDrawable(nextDrawable)
-        wallpaperNext.alpha = 0f
-
-        wallpaperNext.animate()
-            .alpha(1f)
-            .setDuration(1000)
-            .withEndAction {
-                wallpaper.setImageDrawable(nextDrawable)
-                wallpaperNext.alpha = 0f
-
-                val oldBmp = currentBmp
-                currentBmp = nextBmp
-                if (oldBmp != null && oldBmp != nextBmp && !oldBmp.isRecycled) {
-                    oldBmp.recycle()
-                }
-            }
-            .start()
-    }
-
-    private fun chooseWallpaper() {
-        val names = presets.map { it.first } + "Pick image from storage"
-        AlertDialog.Builder(this).setTitle("Wallpaper")
-            .setItems(names.toTypedArray()) { _, which ->
-                if (which < presets.size) {
-                    prefs.edit().putInt("preset", which).putBoolean("custom", false).putLong("wallpaper_version", System.currentTimeMillis()).apply()
-                    applyWallpaper()
-                } else pickImage()
-            }.show()
-    }
-
-    private fun pickImage() {
-        try {
-            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                addCategory(Intent.CATEGORY_OPENABLE); type = "image/*"
-            }, 1)
-        } catch (_: ActivityNotFoundException) {
-            Toast.makeText(this, "No file picker on this device", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    private fun saveCustomWallpaper(bytes: ByteArray): Boolean {
-        val savedId = AppUtils.saveWallpaperPhoto(filesDir, null, bytes) ?: return false
-        prefs.edit().putBoolean("custom", true).putLong("wallpaper_version", System.currentTimeMillis()).apply()
-        runOnUiThread { applyWallpaper() }
-        return true
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(req: Int, res: Int, data: Intent?) {
-        super.onActivityResult(req, res, data)
-        val uri: Uri = data?.data ?: return
-        if (req != 1 || res != RESULT_OK) return
-        thread {
-            val ok = try {
-                contentResolver.openInputStream(uri)?.use { saveCustomWallpaper(it.readBytes()) } ?: false
-            } catch (_: Exception) { false }
-            if (!ok) runOnUiThread { Toast.makeText(this, "Couldn't load image", Toast.LENGTH_SHORT).show() }
-        }
-    }
-}
-
-class CategoryRowAdapter(
-    private val rows: List<CategoryRowItem>,
-    private val sharedViewPool: RecyclerView.RecycledViewPool,
-    private val onAppClick: (AppEntry) -> Unit,
-    private val onAppLongClick: (AppEntry, View) -> Unit
-) : RecyclerView.Adapter<CategoryRowAdapter.VH>() {
-
-    class VH(v: View) : RecyclerView.ViewHolder(v) {
-        val rowTitle: TextView = v.findViewById(R.id.rowTitle)
-        val rowRecyclerView: RecyclerView = v.findViewById(R.id.rowRecyclerView)
-    }
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-        val v = LayoutInflater.from(parent.context).inflate(R.layout.item_category_row, parent, false)
-        val h = VH(v)
-        h.rowRecyclerView.layoutManager = LinearLayoutManager(parent.context, LinearLayoutManager.HORIZONTAL, false).apply {
-            initialPrefetchItemCount = 2
-        }
-        h.rowRecyclerView.setRecycledViewPool(sharedViewPool)
-        h.rowRecyclerView.setHasFixedSize(true)
-        h.rowRecyclerView.isNestedScrollingEnabled = false
-        return h
-    }
-
-    override fun onBindViewHolder(holder: VH, position: Int) {
-        val row = rows[position]
-        holder.rowTitle.text = row.title.uppercase(Locale.US)
-        val adapter = AppAdapter(holder.rowRecyclerView, onAppClick, onAppLongClick)
-        holder.rowRecyclerView.adapter = adapter
-        adapter.submit(row.apps)
-    }
-
-    override fun getItemCount() = rows.size
-}
-
-class ToolsAdapter(
-    private val tiles: List<ToolTile>,
-    private val onClick: (ToolTile) -> Unit
-) : RecyclerView.Adapter<ToolsAdapter.VH>() {
-
-    class VH(v: View) : RecyclerView.ViewHolder(v) {
-        val cardContainer: FrameLayout = v.findViewById(R.id.cardContainer)
-        val toolIcon: ImageView = v.findViewById(R.id.toolIcon)
-        val toolLabel: TextView = v.findViewById(R.id.toolLabel)
-        val cardBorder: View = v.findViewById(R.id.cardBorder)
-
-        init {
-            cardContainer.outlineProvider = ViewOutlineProvider.BACKGROUND
-            cardContainer.clipToOutline = true
-        }
-    }
-
-    override fun onCreateViewHolder(p: ViewGroup, t: Int): VH {
-        val v = LayoutInflater.from(p.context).inflate(R.layout.item_tool_tile, p, false)
-        val h = VH(v)
-
-        v.setOnFocusChangeListener { _, focused ->
-            val duration = 160L
-            val density = v.resources.displayMetrics.density
-            val scale = if (focused) 1.1f else 1.0f
-            val alpha = if (focused) 1f else 0f
-
-            h.cardContainer.animate()
-                .scaleX(scale)
-                .scaleY(scale)
-                .translationZ(if (focused) 6f * density else 0f)
-                .setDuration(duration)
-                .start()
-
-            h.cardBorder.animate()
-                .alpha(alpha)
-                .setDuration(duration)
-                .start()
-        }
-
-        return h
-    }
-
-    override fun onBindViewHolder(h: VH, pos: Int) {
-        val item = tiles[pos]
-        h.toolLabel.text = item.label
-        h.toolIcon.setImageResource(item.iconRes)
-        h.itemView.setOnClickListener { onClick(item) }
-    }
-
-    override fun getItemCount() = tiles.size
-}
-
-class AppAdapter(
-    private val recyclerView: RecyclerView,
-    private val onAppClick: (AppEntry) -> Unit,
-    private val onAppLongClick: (AppEntry, View) -> Unit
-) : RecyclerView.Adapter<AppAdapter.VH>() {
-
-    private var items: List<AppEntry> = emptyList()
-    private var isFirstLoad = true
-
-    fun submit(l: List<AppEntry>) {
-        items = l
-        notifyDataSetChanged()
-        if (isFirstLoad && l.isNotEmpty()) {
-            isFirstLoad = false
-            recyclerView.alpha = 0f
-            recyclerView.translationY = 60f * recyclerView.resources.displayMetrics.density
-            recyclerView.animate()
-                .alpha(1f)
-                .translationY(0f)
-                .setDuration(350)
-                .setInterpolator(DecelerateInterpolator())
-                .withEndAction {
-                    recyclerView.post {
-                        val vh = recyclerView.findViewHolderForAdapterPosition(0)
-                        vh?.itemView?.requestFocus()
-                    }
-                }
-                .start()
-        }
-    }
-
-    class VH(v: View) : RecyclerView.ViewHolder(v) {
-        val cardContainer: FrameLayout = v.findViewById(R.id.cardContainer)
-        val cardImage: ImageView = v.findViewById(R.id.cardImage)
-        val iconLayout: FrameLayout = v.findViewById(R.id.iconLayout)
-        val cardIcon: ImageView = v.findViewById(R.id.cardIcon)
-        val cardBorder: View = v.findViewById(R.id.cardBorder)
-        val label: TextView = v.findViewById(R.id.label)
-
-        init {
-            cardContainer.outlineProvider = ViewOutlineProvider.BACKGROUND
-            cardContainer.clipToOutline = true
-        }
-    }
-
-    override fun onCreateViewHolder(p: ViewGroup, t: Int): VH {
-        val v = LayoutInflater.from(p.context).inflate(R.layout.item_app, p, false)
-        val h = VH(v)
-
-        v.setOnFocusChangeListener { _, focused ->
-            val duration = 160L
-            val density = v.resources.displayMetrics.density
-            val scale = if (focused) 1.1f else 1.0f
-            val alpha = if (focused) 1f else 0f
-
-            h.cardContainer.animate()
-                .scaleX(scale)
-                .scaleY(scale)
-                .translationZ(if (focused) 8f * density else 0f)
-                .setDuration(duration)
-                .start()
-
-            h.cardBorder.animate()
-                .alpha(alpha)
-                .setDuration(duration)
-                .start()
-
-            h.label.animate()
-                .alpha(alpha)
-                .setDuration(duration)
-                .start()
-        }
-
-        v.setOnLongClickListener {
-            val pos = h.bindingAdapterPosition
-            if (pos != RecyclerView.NO_POSITION && pos < items.size) {
-                onAppLongClick(items[pos], v)
-            }
-            true
-        }
-
-        return h
-    }
-
-    override fun onBindViewHolder(h: VH, pos: Int) {
-        val e = items[pos]
-        h.label.text = e.label
-
-        if (e.banner != null) {
-            h.cardImage.setImageDrawable(e.banner)
-            h.cardImage.visibility = View.VISIBLE
-            h.iconLayout.visibility = View.GONE
-            h.cardContainer.setBackgroundResource(R.drawable.card_bg)
-        } else {
-            h.cardImage.visibility = View.GONE
-            h.iconLayout.visibility = View.VISIBLE
-            h.cardIcon.setImageDrawable(e.icon)
-            val gradient = createIconGradient(e.averageColor, h.itemView.resources.displayMetrics.density)
-            h.cardContainer.background = gradient
-        }
-
-        h.itemView.setOnClickListener { onAppClick(e) }
-    }
-
-    private fun createIconGradient(avgColor: Int, density: Float): GradientDrawable {
-        val hsv = FloatArray(3)
-        Color.colorToHSV(avgColor, hsv)
-        val topColor = Color.HSVToColor(floatArrayOf(hsv[0], (hsv[1] * 0.75f).coerceIn(0f, 1f), (hsv[2] * 0.65f).coerceIn(0.2f, 0.85f)))
-        val bottomColor = Color.HSVToColor(floatArrayOf(hsv[0], (hsv[1] * 0.85f).coerceIn(0f, 1f), (hsv[2] * 0.25f).coerceIn(0.1f, 0.45f)))
-        return GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(topColor, bottomColor)).apply {
-            cornerRadius = 18f * density
-        }
-    }
-
-    override fun getItemCount() = items.size
 }
