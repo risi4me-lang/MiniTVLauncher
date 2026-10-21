@@ -5,12 +5,19 @@
     android:clipChildren="false"
     android:clipToPadding="false">
 
-    <!-- Wallpaper -->
+    <!-- Wallpaper Layers for Crossfade -->
     <ImageView
         android:id="@+id/wallpaper"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:scaleType="centerCrop" />
+
+    <ImageView
+        android:id="@+id/wallpaperNext"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:alpha="0" />
 
     <!-- Soft top-to-bottom scrim gradient -->
     <View

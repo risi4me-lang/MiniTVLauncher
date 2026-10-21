@@ -15,6 +15,8 @@ interface RemoteHost {
     fun sendKey(name: String): String?
     fun launchPkg(pkg: String): Boolean
     fun saveWallpaper(bytes: ByteArray): Boolean
+    fun getWallpapersJson(): String
+    fun deleteWallpaper(id: String): Boolean
     fun pageHtml(): ByteArray
     fun getSettingsJson(): String
     fun updateSettings(jsonStr: String): Boolean
@@ -283,6 +285,14 @@ class RemoteServer(private val pin: String, private val host: RemoteHost) {
                         reply(out, if (ok) 200 else 400, "application/json", "{\"status\":\"ok\"}".toByteArray())
                     }
                     "/launch" -> reply(out, if (host.launchPkg(q["pkg"] ?: "")) 200 else 404, "text/plain", ByteArray(0))
+                    "/wallpapers" -> {
+                        reply(out, 200, "application/json", host.getWallpapersJson().toByteArray(Charsets.UTF_8))
+                    }
+                    "/wallpaper/delete" -> {
+                        val id = q["id"] ?: ""
+                        val ok = host.deleteWallpaper(id)
+                        reply(out, if (ok) 200 else 400, "application/json", "{\"status\":\"ok\"}".toByteArray())
+                    }
                     "/wallpaper" -> {
                         if (len > 8_000_000) {
                             reply(out, 413, "text/plain", "Image too large (max 8 MB)".toByteArray(Charsets.UTF_8))

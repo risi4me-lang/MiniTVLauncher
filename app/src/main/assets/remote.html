@@ -217,8 +217,22 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
     </div>
 
     <div class="card">
-      <label class="section-title">Wallpaper</label>
-      <label class="btn btn-secondary">
+      <label class="section-title">Wallpaper Slideshow</label>
+      <select id="slideshowInterval" class="select-field" onchange="saveSettings()">
+        <option value="0">Off (Static Wallpaper)</option>
+        <option value="5">Every 5 minutes</option>
+        <option value="15">Every 15 minutes</option>
+        <option value="30">Every 30 minutes</option>
+        <option value="60">Every 60 minutes</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <label class="section-title" style="margin:0">Uploaded Wallpapers (<span id="wpCount">0</span>/8)</label>
+      </div>
+      <div id="wallpaperList" style="margin-bottom:12px"></div>
+      <label id="btnUploadWp" class="btn btn-secondary">
         Upload Custom Wallpaper
         <input type="file" accept="image/*" id="wp" onchange="up(this)" style="display:none">
       </label>
@@ -333,7 +347,7 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
 <script>
 let KEY = localStorage.getItem('device_key') || '';
 let PIN = sessionStorage.getItem('pin') || '';
-let APPS = [], FAVS = [], HIDDEN = [];
+let APPS = [], FAVS = [], HIDDEN = [], WALLPAPERS = [];
 
 let keyQueue = [];
 let consecutiveFailures = 0;
@@ -467,6 +481,7 @@ function start() {
     document.getElementById('mainView').style.display = 'block';
     loadFavorites();
     loadHidden();
+    loadWallpapers();
     renderApps();
     renderQuickApps();
     loadSettings();
@@ -659,6 +674,79 @@ function loadHidden() {
     renderApps();
     renderQuickApps();
   }).catch(() => {});
+}
+
+function loadWallpapers() {
+  api('/wallpapers').then(r => r.json()).then(data => {
+    WALLPAPERS = data || [];
+    renderWallpapers();
+  }).catch(() => {});
+}
+
+function renderWallpapers() {
+  const container = document.getElementById('wallpaperList');
+  const countSpan = document.getElementById('wpCount');
+  const uploadBtn = document.getElementById('btnUploadWp');
+
+  if (!container || !countSpan) return;
+
+  container.innerHTML = '';
+  countSpan.textContent = WALLPAPERS.length;
+
+  if (WALLPAPERS.length >= 8) {
+    uploadBtn.style.opacity = '0.5';
+    uploadBtn.style.pointerEvents = 'none';
+  } else {
+    uploadBtn.style.opacity = '1';
+    uploadBtn.style.pointerEvents = 'auto';
+  }
+
+  if (WALLPAPERS.length === 0) {
+    container.innerHTML = '<div style="font-size:13px;color:#7080a0">No custom wallpapers uploaded yet</div>';
+    return;
+  }
+
+  WALLPAPERS.forEach(wp => {
+    const item = document.createElement('div');
+    item.className = 'app-item';
+
+    const info = document.createElement('div');
+    info.className = 'app-info';
+
+    const name = document.createElement('div');
+    name.className = 'app-name';
+    name.textContent = wp.filename || wp.id;
+
+    info.appendChild(name);
+    item.appendChild(info);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn btn-danger';
+    delBtn.style.width = 'auto';
+    delBtn.style.minHeight = '36px';
+    delBtn.style.padding = '0 12px';
+    delBtn.style.fontSize = '12px';
+    delBtn.style.marginTop = '0';
+    delBtn.textContent = 'Delete';
+    delBtn.onclick = function(e) {
+      e.stopPropagation();
+      deleteWp(wp.id);
+    };
+
+    item.appendChild(delBtn);
+    container.appendChild(item);
+  });
+}
+
+function deleteWp(id) {
+  api('/wallpaper/delete?id=' + encodeURIComponent(id), { method: 'POST' }).then(r => {
+    if (r.ok) {
+      showToast('Wallpaper deleted');
+      start();
+    } else {
+      showToast('Failed to delete wallpaper', true);
+    }
+  }).catch(() => showToast('Failed to delete wallpaper', true));
 }
 
 function renderQuickApps() {
@@ -935,10 +1023,75 @@ function createAppItem(a, isFav, isHid) {
 function up(input) {
   const f = input.files[0];
   if (!f) return;
-  api('/wallpaper', { method: 'POST', body: f }).then(r => {
-    if (r.ok) showToast('Wallpaper updated');
-    else showToast('Wallpaper upload failed', true);
-  });
+
+  if (WALLPAPERS.length >= 8) {
+    showToast('Maximum 8 wallpapers allowed', true);
+    input.value = '';
+    return;
+  }
+
+  showToast("Uploading...");
+
+  const img = new Image();
+  const reader = new FileReader();
+
+  reader.onload = function(e) {
+    img.onload = function() {
+      let w = img.width;
+      let h = img.height;
+      const maxDim = 1920;
+      if (w > maxDim || h > maxDim) {
+        if (w >= h) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        } else {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+
+      canvas.toBlob(function(blob) {
+        input.value = '';
+        if (!blob) {
+          showToast('Unsupported image format', true);
+          return;
+        }
+
+        api('/wallpaper', {
+          method: 'POST',
+          body: blob
+        }).then(r => {
+          if (r.ok) {
+            showToast('Wallpaper updated');
+            start();
+          } else if (r.status === 413) {
+            showToast('Image too large (max 8 MB)', true);
+          } else {
+            r.text().then(msg => showToast(msg || 'Unsupported image format', true))
+             .catch(() => showToast('Unsupported image format', true));
+          }
+        }).catch(() => {
+          showToast('Upload failed', true);
+        });
+      }, 'image/jpeg', 0.85);
+    };
+    img.onerror = function() {
+      input.value = '';
+      showToast('Unsupported image format', true);
+    };
+    img.src = e.target.result;
+  };
+  reader.onerror = function() {
+    input.value = '';
+    showToast('Failed to read image', true);
+  };
+  reader.readAsDataURL(f);
 }
 
 function loadSettings() {
@@ -950,6 +1103,7 @@ function loadSettings() {
     document.getElementById('sortMode').value = s.sortMode || 'alphabetical';
     document.getElementById('homeQrMode').value = s.homeQrMode || 'always';
     document.getElementById('groupByCategory').checked = s.groupByCategory !== false;
+    document.getElementById('slideshowInterval').value = s.slideshowInterval !== undefined ? s.slideshowInterval : 0;
     updateAccDots(s.accessibilityEnabled !== false);
   }).catch(() => {});
 }
@@ -962,7 +1116,8 @@ function saveSettings() {
     showDate: document.getElementById('showDate').checked,
     sortMode: document.getElementById('sortMode').value,
     homeQrMode: document.getElementById('homeQrMode').value,
-    groupByCategory: document.getElementById('groupByCategory').checked
+    groupByCategory: document.getElementById('groupByCategory').checked,
+    slideshowInterval: parseInt(document.getElementById('slideshowInterval').value) || 0
   };
   api('/settings', {
     method: 'POST',

@@ -356,31 +356,39 @@ class RemoteService : Service(), RemoteHost {
         } catch (_: Exception) { false }
     }
 
-    override fun saveWallpaper(bytes: ByteArray): Boolean {
-        return try {
-            val b = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, b)
-            if (b.outWidth <= 0 || b.outHeight <= 0) return false
+    override fun getWallpapersJson(): String {
+        val files = AppUtils.getWallpaperFiles(filesDir)
+        val arr = JSONArray()
+        files.forEach { file ->
+            val id = file.nameWithoutExtension
+            arr.put(JSONObject().apply {
+                put("id", id)
+                put("filename", file.name)
+            })
+        }
+        return arr.toString()
+    }
 
-            var s = 1
-            while (b.outWidth / (s * 2) >= 1920) s *= 2
-            val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size,
-                BitmapFactory.Options().apply { inSampleSize = s }) ?: return false
-
-            File(filesDir, "wallpaper.jpg").outputStream().use { out ->
-                bmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
-            }
-            bmp.recycle()
-
-            prefs.edit()
-                .putBoolean("custom", true)
-                .putLong("wallpaper_version", System.currentTimeMillis())
-                .apply()
-
+    override fun deleteWallpaper(id: String): Boolean {
+        val ok = AppUtils.deleteWallpaperPhoto(filesDir, id)
+        if (ok) {
+            prefs.edit().putLong("wallpaper_version", System.currentTimeMillis()).apply()
             val main = MainActivity.activeInstance?.get()
             main?.runOnUiThread { main.applyWallpaper() }
-            true
-        } catch (_: Exception) { false }
+        }
+        return ok
+    }
+
+    override fun saveWallpaper(bytes: ByteArray): Boolean {
+        val savedId = AppUtils.saveWallpaperPhoto(filesDir, null, bytes) ?: return false
+        prefs.edit()
+            .putBoolean("custom", true)
+            .putLong("wallpaper_version", System.currentTimeMillis())
+            .apply()
+
+        val main = MainActivity.activeInstance?.get()
+        main?.runOnUiThread { main.applyWallpaper() }
+        return true
     }
 
     override fun pageHtml(): ByteArray {
@@ -396,6 +404,7 @@ class RemoteService : Service(), RemoteHost {
             put("sortMode", prefs.getString("app_sort_mode", "alphabetical") ?: "alphabetical")
             put("homeQrMode", prefs.getString("home_qr_mode", "always") ?: "always")
             put("groupByCategory", prefs.getBoolean("group_by_category", true))
+            put("slideshowInterval", prefs.getInt("wallpaper_slideshow_interval", 0))
             put("accessibilityEnabled", RemoteAccessibilityService.isEnabled(this@RemoteService))
         }
         return json.toString()
@@ -412,9 +421,10 @@ class RemoteService : Service(), RemoteHost {
             if (json.has("sortMode")) editor.putString("app_sort_mode", json.getString("sortMode"))
             if (json.has("homeQrMode")) editor.putString("home_qr_mode", json.getString("homeQrMode"))
             if (json.has("groupByCategory")) editor.putBoolean("group_by_category", json.getBoolean("groupByCategory"))
+            if (json.has("slideshowInterval")) editor.putInt("wallpaper_slideshow_interval", json.getInt("slideshowInterval"))
             editor.apply()
             val main = MainActivity.activeInstance?.get()
-            main?.runOnUiThread { main.reloadAppsAndRefresh() }
+            main?.runOnUiThread { main.applyWallpaper(); main.reloadAppsAndRefresh() }
             true
         } catch (_: Exception) {
             false

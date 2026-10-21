@@ -92,6 +92,7 @@ class MainActivity : Activity() {
     @Volatile private var currentVisibleApps: List<AppEntry> = emptyList()
 
     private lateinit var wallpaper: ImageView
+    private lateinit var wallpaperNext: ImageView
     private lateinit var mainScrollView: NestedScrollView
     private lateinit var rowsContainer: RecyclerView
     private lateinit var toolsRow: RecyclerView
@@ -124,6 +125,20 @@ class MainActivity : Activity() {
         }
     }
 
+    private val slideshowHandler = Handler(Looper.getMainLooper())
+    private var slideshowIndex = 0
+    private var currentBmp: Bitmap? = null
+
+    private val slideshowRunnable = object : Runnable {
+        override fun run() {
+            performSlideshowTransition()
+            val minutes = prefs.getInt("wallpaper_slideshow_interval", 0)
+            if (minutes > 0) {
+                slideshowHandler.postDelayed(this, minutes * 60 * 1000L)
+            }
+        }
+    }
+
     private val prefs by lazy { getSharedPreferences("launcher", MODE_PRIVATE) }
     private val pkgReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, i: Intent?) = loadApps()
@@ -132,7 +147,7 @@ class MainActivity : Activity() {
     private val prefChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == "user_name" || key == "clock_is_12h" || key == "clock_show_seconds" || key == "clock_show_date" || key == "favorite_pkgs_json" || key == "hidden_pkgs_json" || key == "app_rename_map" || key == "app_category_map" || key == "group_by_category" || key == "app_launch_counts" || key == "app_sort_mode") {
             runOnUiThread { applySettings(); reloadAppsAndRefresh() }
-        } else if (key == "preset" || key == "custom" || key == "wallpaper_version") {
+        } else if (key == "preset" || key == "custom" || key == "wallpaper_version" || key == "wallpaper_slideshow_interval") {
             runOnUiThread { applyWallpaper() }
         } else if (key == "home_qr_mode" || key == "paired_devices_json") {
             runOnUiThread { updateHomeQrVisibility(); refreshToolsRow() }
@@ -152,7 +167,14 @@ class MainActivity : Activity() {
     private val presets = listOf(
         "Dark gradient" to intArrayOf(0xFF0B0F1A.toInt(), 0xFF1B2440.toInt()),
         "Charcoal" to intArrayOf(0xFF101010.toInt(), 0xFF2A2A2A.toInt()),
-        "Deep teal" to intArrayOf(0xFF041A1F.toInt(), 0xFF0E4B52.toInt())
+        "Deep teal" to intArrayOf(0xFF041A1F.toInt(), 0xFF0E4B52.toInt()),
+        "Midnight blue" to intArrayOf(0xFF030A16.toInt(), 0xFF122240.toInt()),
+        "Dark violet" to intArrayOf(0xFF12031A.toInt(), 0xFF320E42.toInt()),
+        "Obsidian emerald" to intArrayOf(0xFF03160C.toInt(), 0xFF0E3821.toInt()),
+        "Ember dark" to intArrayOf(0xFF1A0A03.toInt(), 0xFF421D0E.toInt()),
+        "Cosmic indigo" to intArrayOf(0xFF08031A.toInt(), 0xFF210E42.toInt()),
+        "Slate graphite" to intArrayOf(0xFF13171F.toInt(), 0xFF2D3545.toInt()),
+        "Deep wine" to intArrayOf(0xFF1A030A.toInt(), 0xFF420E1C.toInt())
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -162,6 +184,7 @@ class MainActivity : Activity() {
         prefs.registerOnSharedPreferenceChangeListener(prefChangeListener)
 
         wallpaper = findViewById(R.id.wallpaper)
+        wallpaperNext = findViewById(R.id.wallpaperNext)
         mainScrollView = findViewById(R.id.mainScrollView)
         toolsRow = findViewById(R.id.toolsRow)
         rowsContainer = findViewById(R.id.rowsContainer)
@@ -300,8 +323,11 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         prefs.unregisterOnSharedPreferenceChangeListener(prefChangeListener)
         qrHandler.removeCallbacks(qrRefreshRunnable)
+        slideshowHandler.removeCallbacks(slideshowRunnable)
         homeQrBitmap?.recycle()
         homeQrBitmap = null
+        currentBmp?.recycle()
+        currentBmp = null
         if (activeInstance?.get() == this) {
             activeInstance = null
         }
@@ -1177,10 +1203,17 @@ class MainActivity : Activity() {
 
         qrHandler.removeCallbacks(qrRefreshRunnable)
         qrHandler.post(qrRefreshRunnable)
+
+        slideshowHandler.removeCallbacks(slideshowRunnable)
+        val intervalMinutes = prefs.getInt("wallpaper_slideshow_interval", 0)
+        if (intervalMinutes > 0) {
+            slideshowHandler.postDelayed(slideshowRunnable, intervalMinutes * 60 * 1000L)
+        }
     }
 
     override fun onStop() {
         qrHandler.removeCallbacks(qrRefreshRunnable)
+        slideshowHandler.removeCallbacks(slideshowRunnable)
         if (activeInstance?.get() == this) {
             activeInstance = null
         }
@@ -1413,19 +1446,80 @@ class MainActivity : Activity() {
         return bitmap
     }
 
-    // ---- Wallpaper ----
+    // ---- Wallpaper & Slideshow ----
     fun applyWallpaper() {
-        val f = File(filesDir, "wallpaper.jpg")
-        val idx = prefs.getInt("preset", 0)
-        if (prefs.getBoolean("custom", false) && f.exists()) {
-            val bmp = BitmapFactory.decodeFile(f.path)
-            if (bmp != null) {
-                wallpaper.setImageBitmap(bmp)
-            }
+        slideshowHandler.removeCallbacks(slideshowRunnable)
+        val customFiles = AppUtils.getWallpaperFiles(filesDir)
+        val isCustom = prefs.getBoolean("custom", false)
+
+        val nextBmp: Bitmap?
+        val drawable: Drawable?
+
+        if (isCustom && customFiles.isNotEmpty()) {
+            val file = customFiles[slideshowIndex.coerceIn(0, customFiles.size - 1)]
+            nextBmp = BitmapFactory.decodeFile(file.path)
+            drawable = if (nextBmp != null) BitmapDrawable(resources, nextBmp) else null
         } else {
-            val c = presets[idx.coerceIn(0, presets.size - 1)].second
-            wallpaper.setImageDrawable(GradientDrawable(GradientDrawable.Orientation.TL_BR, c))
+            nextBmp = null
+            val idx = prefs.getInt("preset", 0).coerceIn(0, presets.size - 1)
+            val c = presets[idx].second
+            drawable = GradientDrawable(GradientDrawable.Orientation.TL_BR, c)
         }
+
+        wallpaper.setImageDrawable(drawable)
+        wallpaperNext.animate().cancel()
+        wallpaperNext.alpha = 0f
+
+        val oldBmp = currentBmp
+        currentBmp = nextBmp
+        if (oldBmp != null && oldBmp != nextBmp && !oldBmp.isRecycled) {
+            oldBmp.recycle()
+        }
+
+        val intervalMinutes = prefs.getInt("wallpaper_slideshow_interval", 0)
+        if (intervalMinutes > 0) {
+            slideshowHandler.postDelayed(slideshowRunnable, intervalMinutes * 60 * 1000L)
+        }
+    }
+
+    private fun performSlideshowTransition() {
+        val customFiles = AppUtils.getWallpaperFiles(filesDir)
+        val isCustom = prefs.getBoolean("custom", false)
+
+        val nextBmp: Bitmap?
+        val nextDrawable: Drawable?
+
+        if (isCustom && customFiles.isNotEmpty()) {
+            slideshowIndex = (slideshowIndex + 1) % customFiles.size
+            val file = customFiles[slideshowIndex]
+            nextBmp = BitmapFactory.decodeFile(file.path)
+            nextDrawable = if (nextBmp != null) BitmapDrawable(resources, nextBmp) else null
+        } else {
+            nextBmp = null
+            slideshowIndex = (slideshowIndex + 1) % presets.size
+            val c = presets[slideshowIndex].second
+            nextDrawable = GradientDrawable(GradientDrawable.Orientation.TL_BR, c)
+        }
+
+        if (nextDrawable == null) return
+
+        wallpaperNext.setImageDrawable(nextDrawable)
+        wallpaperNext.alpha = 0f
+
+        wallpaperNext.animate()
+            .alpha(1f)
+            .setDuration(1000)
+            .withEndAction {
+                wallpaper.setImageDrawable(nextDrawable)
+                wallpaperNext.alpha = 0f
+
+                val oldBmp = currentBmp
+                currentBmp = nextBmp
+                if (oldBmp != null && oldBmp != nextBmp && !oldBmp.isRecycled) {
+                    oldBmp.recycle()
+                }
+            }
+            .start()
     }
 
     private fun chooseWallpaper() {
@@ -1450,22 +1544,10 @@ class MainActivity : Activity() {
     }
 
     private fun saveCustomWallpaper(bytes: ByteArray): Boolean {
-        return try {
-            val b = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, b)
-            if (b.outWidth <= 0) return false
-            var s = 1
-            while (b.outWidth / (s * 2) >= 1920) s *= 2
-            val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size,
-                BitmapFactory.Options().apply { inSampleSize = s }) ?: return false
-            File(filesDir, "wallpaper.jpg").outputStream().use {
-                bmp.compress(Bitmap.CompressFormat.JPEG, 90, it)
-            }
-            bmp.recycle()
-            prefs.edit().putBoolean("custom", true).putLong("wallpaper_version", System.currentTimeMillis()).apply()
-            runOnUiThread { applyWallpaper() }
-            true
-        } catch (_: Exception) { false }
+        val savedId = AppUtils.saveWallpaperPhoto(filesDir, null, bytes) ?: return false
+        prefs.edit().putBoolean("custom", true).putLong("wallpaper_version", System.currentTimeMillis()).apply()
+        runOnUiThread { applyWallpaper() }
+        return true
     }
 
     @Deprecated("Deprecated in Java")

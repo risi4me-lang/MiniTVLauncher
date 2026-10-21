@@ -223,4 +223,65 @@ object AppUtils {
             if (file.exists()) file.delete() else true
         } catch (_: Exception) { false }
     }
+
+    // ---- Multi-Wallpaper Helpers ----
+    fun getWallpaperDir(filesDir: File): File {
+        val dir = File(filesDir, "wallpapers")
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
+
+    fun getWallpaperFiles(filesDir: File): List<File> {
+        val dir = getWallpaperDir(filesDir)
+        val files = dir.listFiles { _, name -> name.startsWith("wp_") && name.endsWith(".jpg") } ?: emptyArray()
+        return files.sortedBy { it.name }
+    }
+
+    fun saveWallpaperPhoto(filesDir: File, targetId: String?, bytes: ByteArray): String? {
+        val existingFiles = getWallpaperFiles(filesDir)
+        val idToUse = if (!targetId.isNullOrBlank()) {
+            targetId
+        } else {
+            // Find first free id from 1 to 8
+            var foundId: String? = null
+            for (i in 1..8) {
+                val candidate = "wp_$i"
+                if (existingFiles.none { it.name == "$candidate.jpg" }) {
+                    foundId = candidate
+                    break
+                }
+            }
+            foundId ?: return null // Reached 8 limit
+        }
+
+        return try {
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+            if (options.outWidth <= 0 || options.outHeight <= 0) return null
+
+            var sampleSize = 1
+            while (options.outWidth / (sampleSize * 2) >= 1920) sampleSize *= 2
+
+            val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+            val decodedBmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, decodeOpts) ?: return null
+
+            val dir = getWallpaperDir(filesDir)
+            val file = File(dir, "$idToUse.jpg")
+            file.outputStream().use { out ->
+                decodedBmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
+            }
+            decodedBmp.recycle()
+            idToUse
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun deleteWallpaperPhoto(filesDir: File, id: String): Boolean {
+        return try {
+            val dir = getWallpaperDir(filesDir)
+            val file = File(dir, "$id.jpg")
+            if (file.exists()) file.delete() else true
+        } catch (_: Exception) { false }
+    }
 }
