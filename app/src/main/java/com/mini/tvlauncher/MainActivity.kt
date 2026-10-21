@@ -10,6 +10,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.BitmapFactory
+import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
@@ -29,6 +30,7 @@ import android.text.TextWatcher
 import android.view.*
 import android.view.animation.DecelerateInterpolator
 import android.widget.*
+import androidx.core.widget.NestedScrollView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.zxing.BarcodeFormat
@@ -89,6 +91,7 @@ class MainActivity : Activity() {
     @Volatile private var currentVisibleApps: List<AppEntry> = emptyList()
 
     private lateinit var wallpaper: ImageView
+    private lateinit var mainScrollView: NestedScrollView
     private lateinit var rowsContainer: RecyclerView
     private lateinit var toolsRow: RecyclerView
 
@@ -153,10 +156,34 @@ class MainActivity : Activity() {
         prefs.registerOnSharedPreferenceChangeListener(prefChangeListener)
 
         wallpaper = findViewById(R.id.wallpaper)
+        mainScrollView = findViewById(R.id.mainScrollView)
         toolsRow = findViewById(R.id.toolsRow)
         rowsContainer = findViewById(R.id.rowsContainer)
 
         rowsContainer.layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
+        rowsContainer.isNestedScrollingEnabled = false
+
+        mainScrollView.viewTreeObserver.addOnGlobalFocusChangeListener { _, newFocus ->
+            if (newFocus != null && isChildOf(mainScrollView, newFocus)) {
+                val rect = Rect()
+                newFocus.getDrawingRect(rect)
+                mainScrollView.offsetDescendantRectToMyCoords(newFocus, rect)
+
+                rect.top = (rect.top - (24 * resources.displayMetrics.density).toInt()).coerceAtLeast(0)
+                rect.bottom = rect.bottom + (24 * resources.displayMetrics.density).toInt()
+
+                val scrollY = mainScrollView.scrollY
+                val height = mainScrollView.height
+
+                if (rect.bottom > scrollY + height) {
+                    val targetY = rect.bottom - height
+                    mainScrollView.smoothScrollTo(0, targetY)
+                } else if (rect.top < scrollY) {
+                    val targetY = rect.top
+                    mainScrollView.smoothScrollTo(0, targetY)
+                }
+            }
+        }
 
         searchPillBtn = findViewById(R.id.searchPillBtn)
         searchPanel = findViewById(R.id.searchPanel)
@@ -225,6 +252,15 @@ class MainActivity : Activity() {
         loadApps()
         startRemoteService()
         requestNotificationPermissionIfNeeded()
+    }
+
+    private fun isChildOf(parent: ViewGroup, child: View): Boolean {
+        var p = child.parent
+        while (p != null) {
+            if (p == parent) return true
+            p = p.parent
+        }
+        return false
     }
 
     private fun requestNotificationPermissionIfNeeded() {
@@ -1120,7 +1156,7 @@ class MainActivity : Activity() {
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
-        rowsContainer.scrollToPosition(0)
+        mainScrollView.smoothScrollTo(0, 0)
     }
 
     private fun launch(e: AppEntry) {
@@ -1401,6 +1437,7 @@ class CategoryRowAdapter(
         }
         h.rowRecyclerView.setRecycledViewPool(sharedViewPool)
         h.rowRecyclerView.setHasFixedSize(true)
+        h.rowRecyclerView.isNestedScrollingEnabled = false
         return h
     }
 
