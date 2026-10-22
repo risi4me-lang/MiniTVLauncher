@@ -86,15 +86,15 @@ class MainActivity : Activity() {
 
     private val prefChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == "user_name" || key == "clock_is_12h" || key == "clock_show_seconds" || key == "clock_show_date" || key == "favorite_pkgs_json" || key == "hidden_pkgs_json" || key == "app_rename_map" || key == "app_category_map" || key == "group_by_category" || key == "app_launch_counts" || key == "app_sort_mode") {
-            runOnUiThread { settingsApplier.applySettings(); reloadAppsAndRefresh() }
+            runOnUiThread { try { settingsApplier.applySettings(); reloadAppsAndRefresh() } catch (_: Exception) {} }
         } else if (key == "preset" || key == "custom" || key == "wallpaper_version" || key == "wallpaper_slideshow_interval") {
-            runOnUiThread { wallpaperManager.applyWallpaper() }
+            runOnUiThread { try { wallpaperManager.applyWallpaper() } catch (_: Exception) {} }
         } else if (key == "home_qr_mode" || key == "paired_devices_json") {
-            runOnUiThread { qrPairingManager.updateHomeQrVisibility(); refreshToolsRow() }
+            runOnUiThread { try { qrPairingManager.updateHomeQrVisibility(); refreshToolsRow() } catch (_: Exception) {} }
         } else if (key == "screensaver_timeout_minutes") {
-            runOnUiThread { resetIdleTimer() }
+            runOnUiThread { try { resetIdleTimer() } catch (_: Exception) {} }
         } else if (key == "weather_city" || key == "weather_unit") {
-            runOnUiThread { settingsApplier.fetchWeatherBackground() }
+            runOnUiThread { try { settingsApplier.fetchWeatherBackground() } catch (_: Exception) {} }
         }
     }
 
@@ -102,7 +102,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        prefs.registerOnSharedPreferenceChangeListener(prefChangeListener)
+        try { prefs.registerOnSharedPreferenceChangeListener(prefChangeListener) } catch (_: Exception) {}
 
         mainScrollView = findViewById(R.id.mainScrollView)
         toolsRow = findViewById(R.id.toolsRow)
@@ -150,8 +150,8 @@ class MainActivity : Activity() {
         )
 
         networkIndicator = NetworkIndicator(this, findViewById(R.id.netIcon)) {
-            qrPairingManager.refreshHomeQrCode()
-            settingsApplier.fetchWeatherBackground()
+            try { qrPairingManager.refreshHomeQrCode() } catch (_: Exception) {}
+            try { settingsApplier.fetchWeatherBackground() } catch (_: Exception) {}
         }
 
         searchPanelManager = SearchPanelManager(
@@ -201,7 +201,7 @@ class MainActivity : Activity() {
         screensaverPanel.setOnClickListener { dismissScreensaver() }
 
         toolsRow.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        refreshToolsRow()
+        try { refreshToolsRow() } catch (_: Exception) {}
 
         val wallpaperBtn = findViewById<View>(R.id.wallpaperBtn)
         wallpaperBtn.setOnClickListener { wallpaperManager.chooseWallpaper() }
@@ -223,16 +223,16 @@ class MainActivity : Activity() {
             }
         }
 
-        settingsApplier.applySettings()
-        wallpaperManager.applyWallpaper()
-        loadApps()
-        startRemoteService()
-        requestNotificationPermissionIfNeeded()
+        try { settingsApplier.applySettings() } catch (_: Exception) {}
+        try { wallpaperManager.applyWallpaper() } catch (_: Exception) {}
+        try { loadApps() } catch (_: Exception) {}
+        try { startRemoteService() } catch (_: Exception) {}
+        try { requestNotificationPermissionIfNeeded() } catch (_: Exception) {}
     }
 
     fun launch(e: AppEntry) {
-        AppUtils.incrementLaunchCount(prefs, e.pkg)
-        reloadAppsAndRefresh()
+        try { AppUtils.incrementLaunchCount(prefs, e.pkg) } catch (_: Exception) {}
+        try { reloadAppsAndRefresh() } catch (_: Exception) {}
         try { startActivity(e.intent) } catch (_: Exception) {
             Toast.makeText(this, "Can't open ${e.label}", Toast.LENGTH_SHORT).show()
         }
@@ -263,14 +263,16 @@ class MainActivity : Activity() {
 
     fun resetIdleTimer() {
         runOnUiThread {
-            if (screensaverPanel.visibility == View.VISIBLE) {
-                dismissScreensaver()
-            }
-            idleHandler.removeCallbacks(idleRunnable)
-            val timeoutMinutes = prefs.getInt("screensaver_timeout_minutes", 0)
-            if (timeoutMinutes > 0) {
-                idleHandler.postDelayed(idleRunnable, timeoutMinutes * 60 * 1000L)
-            }
+            try {
+                if (screensaverPanel.visibility == View.VISIBLE) {
+                    dismissScreensaver()
+                }
+                idleHandler.removeCallbacks(idleRunnable)
+                val timeoutMinutes = prefs.getInt("screensaver_timeout_minutes", 0)
+                if (timeoutMinutes > 0) {
+                    idleHandler.postDelayed(idleRunnable, timeoutMinutes * 60 * 1000L)
+                }
+            } catch (_: Exception) {}
         }
     }
 
@@ -326,10 +328,10 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        prefs.unregisterOnSharedPreferenceChangeListener(prefChangeListener)
-        qrPairingManager.stop()
-        wallpaperManager.destroy()
-        settingsApplier.stopWeatherPolling()
+        try { prefs.unregisterOnSharedPreferenceChangeListener(prefChangeListener) } catch (_: Exception) {}
+        try { qrPairingManager.stop() } catch (_: Exception) {}
+        try { wallpaperManager.destroy() } catch (_: Exception) {}
+        try { settingsApplier.stopWeatherPolling() } catch (_: Exception) {}
         idleHandler.removeCallbacks(idleRunnable)
         driftHandler.removeCallbacks(driftRunnable)
         if (activeInstance?.get() == this) {
@@ -554,8 +556,10 @@ class MainActivity : Activity() {
     }
 
     private fun refreshAppLists() {
-        categoryRowsManager.refreshAppLists(allInstalledApps, ::getFavoritePkgs, ::getHiddenPkgs)
-        refreshHiddenAppsUi()
+        try {
+            categoryRowsManager.refreshAppLists(allInstalledApps, ::getFavoritePkgs, ::getHiddenPkgs)
+            refreshHiddenAppsUi()
+        } catch (_: Exception) {}
     }
 
     // ---- App Options Context Menu ----
@@ -845,47 +849,49 @@ class MainActivity : Activity() {
     }
 
     fun applyWallpaper() {
-        wallpaperManager.applyWallpaper()
+        try { wallpaperManager.applyWallpaper() } catch (_: Exception) {}
     }
 
     fun exchangeToken(token: String): String? {
-        return qrPairingManager.exchangeToken(token)
+        return try { qrPairingManager.exchangeToken(token) } catch (_: Exception) { null }
     }
 
     private fun startRemoteService() {
-        RemoteService.startService(this)
+        try { RemoteService.startService(this) } catch (_: Exception) {}
     }
 
     override fun onStart() {
         super.onStart()
         activeInstance = WeakReference(this)
-        settingsApplier.applySettings()
-        networkIndicator.start()
-        qrPairingManager.start()
-        wallpaperManager.start()
-        settingsApplier.startWeatherPolling()
+        try { settingsApplier.applySettings() } catch (_: Exception) {}
+        try { networkIndicator.start() } catch (_: Exception) {}
+        try { qrPairingManager.start() } catch (_: Exception) {}
+        try { wallpaperManager.start() } catch (_: Exception) {}
+        try { settingsApplier.startWeatherPolling() } catch (_: Exception) {}
 
-        val f = IntentFilter().apply {
-            addAction(Intent.ACTION_PACKAGE_ADDED); addAction(Intent.ACTION_PACKAGE_REMOVED)
-            addAction(Intent.ACTION_PACKAGE_REPLACED); addDataScheme("package")
-        }
-        registerReceiver(pkgReceiver, f)
+        try {
+            val f = IntentFilter().apply {
+                addAction(Intent.ACTION_PACKAGE_ADDED); addAction(Intent.ACTION_PACKAGE_REMOVED)
+                addAction(Intent.ACTION_PACKAGE_REPLACED); addDataScheme("package")
+            }
+            registerReceiver(pkgReceiver, f)
+        } catch (_: Exception) {}
 
-        resetIdleTimer()
+        try { resetIdleTimer() } catch (_: Exception) {}
     }
 
     override fun onStop() {
-        qrPairingManager.stop()
-        wallpaperManager.stop()
-        settingsApplier.stopWeatherPolling()
-        networkIndicator.stop()
+        try { qrPairingManager.stop() } catch (_: Exception) {}
+        try { wallpaperManager.stop() } catch (_: Exception) {}
+        try { settingsApplier.stopWeatherPolling() } catch (_: Exception) {}
+        try { networkIndicator.stop() } catch (_: Exception) {}
         idleHandler.removeCallbacks(idleRunnable)
         driftHandler.removeCallbacks(driftRunnable)
         if (activeInstance?.get() == this) {
             activeInstance = null
         }
         super.onStop()
-        unregisterReceiver(pkgReceiver)
+        try { unregisterReceiver(pkgReceiver) } catch (_: Exception) {}
     }
 
     @Deprecated("Deprecated in Java")
@@ -922,69 +928,71 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(req: Int, res: Int, data: Intent?) {
         super.onActivityResult(req, res, data)
-        wallpaperManager.handleActivityResult(req, res, data)
+        try { wallpaperManager.handleActivityResult(req, res, data) } catch (_: Exception) {}
     }
 
     private fun loadApps() {
         thread {
-            val pm = packageManager
-            val seen = HashSet<String>()
-            val list = ArrayList<AppEntry>()
+            try {
+                val pm = packageManager
+                val seen = HashSet<String>()
+                val list = ArrayList<AppEntry>()
 
-            for (candidate in getShortcutCandidates()) {
-                for (intent in candidate.candidateIntents) {
-                    val target = resolveIntent(pm, intent)
-                    if (target != null) {
-                        val iconDrawable = try {
-                            resources.getDrawable(candidate.iconRes, theme)
-                        } catch (_: Exception) { null }
-                        list.add(
-                            AppEntry(
-                                defaultLabel = candidate.label,
-                                label = candidate.label,
-                                pkg = target.component?.packageName ?: candidate.id,
-                                intent = target,
-                                banner = null,
-                                icon = iconDrawable,
-                                averageColor = candidate.averageColor,
-                                appInfo = target.component?.let { pm.getApplicationInfo(it.packageName, 0) }
+                for (candidate in getShortcutCandidates()) {
+                    for (intent in candidate.candidateIntents) {
+                        val target = resolveIntent(pm, intent)
+                        if (target != null) {
+                            val iconDrawable = try {
+                                resources.getDrawable(candidate.iconRes, theme)
+                            } catch (_: Exception) { null }
+                            list.add(
+                                AppEntry(
+                                    defaultLabel = candidate.label,
+                                    label = candidate.label,
+                                    pkg = target.component?.packageName ?: candidate.id,
+                                    intent = target,
+                                    banner = null,
+                                    icon = iconDrawable,
+                                    averageColor = candidate.averageColor,
+                                    appInfo = target.component?.let { pm.getApplicationInfo(it.packageName, 0) }
+                                )
                             )
-                        )
-                        break
+                            break
+                        }
                     }
                 }
-            }
 
-            val installedApps = ArrayList<AppEntry>()
-            for (cat in listOf(Intent.CATEGORY_LEANBACK_LAUNCHER, Intent.CATEGORY_LAUNCHER)) {
-                val q = Intent(Intent.ACTION_MAIN).addCategory(cat)
-                @Suppress("DEPRECATION")
-                for (ri in pm.queryIntentActivities(q, 0)) {
-                    val pkg = ri.activityInfo.packageName
-                    if (pkg == packageName || !seen.add(pkg)) continue
-                    val i = Intent(Intent.ACTION_MAIN).addCategory(cat)
-                        .setClassName(pkg, ri.activityInfo.name)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                val installedApps = ArrayList<AppEntry>()
+                for (cat in listOf(Intent.CATEGORY_LEANBACK_LAUNCHER, Intent.CATEGORY_LAUNCHER)) {
+                    val q = Intent(Intent.ACTION_MAIN).addCategory(cat)
+                    @Suppress("DEPRECATION")
+                    for (ri in pm.queryIntentActivities(q, 0)) {
+                        val pkg = ri.activityInfo.packageName
+                        if (pkg == packageName || !seen.add(pkg)) continue
+                        val i = Intent(Intent.ACTION_MAIN).addCategory(cat)
+                            .setClassName(pkg, ri.activityInfo.name)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-                    val banner = try {
-                        ri.activityInfo.loadBanner(pm)
-                    } catch (_: Throwable) { null }
+                        val banner = try {
+                            ri.activityInfo.loadBanner(pm)
+                        } catch (_: Throwable) { null }
 
-                    val icon = try {
-                        ri.loadIcon(pm) ?: pm.getApplicationIcon(pkg)
-                    } catch (_: Exception) { null }
+                        val icon = try {
+                            ri.loadIcon(pm) ?: pm.getApplicationIcon(pkg)
+                        } catch (_: Exception) { null }
 
-                    val avgColor = if (banner == null && icon != null) extractAverageColor(icon) else 0xFF1B2440.toInt()
+                        val avgColor = if (banner == null && icon != null) extractAverageColor(icon) else 0xFF1B2440.toInt()
 
-                    val defaultLabel = ri.loadLabel(pm).toString()
-                    installedApps.add(AppEntry(defaultLabel, defaultLabel, pkg, i, banner, icon, avgColor, appInfo = ri.activityInfo.applicationInfo))
+                        val defaultLabel = ri.loadLabel(pm).toString()
+                        installedApps.add(AppEntry(defaultLabel, defaultLabel, pkg, i, banner, icon, avgColor, appInfo = ri.activityInfo.applicationInfo))
+                    }
                 }
-            }
-            list.addAll(installedApps)
+                list.addAll(installedApps)
 
-            rawUnprocessedApps = list
-            allInstalledApps = AppUtils.processAppList(list, prefs, filesDir)
-            runOnUiThread { refreshAppLists() }
+                rawUnprocessedApps = list
+                allInstalledApps = AppUtils.processAppList(list, prefs, filesDir)
+                runOnUiThread { refreshAppLists() }
+            } catch (_: Exception) {}
         }
     }
 
