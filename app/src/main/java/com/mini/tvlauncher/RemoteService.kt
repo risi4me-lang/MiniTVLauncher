@@ -128,6 +128,15 @@ class RemoteService : Service(), RemoteHost {
     }
 
     // ---- RemoteHost Implementation ----
+    override fun openSearch(): String? {
+        val main = MainActivity.activeInstance?.get()
+        if (main != null) {
+            main.runOnUiThread { main.openSearchPanel() }
+            return null
+        }
+        return "Search opens on the launcher home screen"
+    }
+
     override fun getDeviceReport(includeUserApps: Boolean): String {
         return DeviceReportCollector.generateReport(this, includeUserApps)
     }
@@ -590,6 +599,7 @@ class RemoteService : Service(), RemoteHost {
             put("displayMode", prefs.getString("display_mode", "standard") ?: "standard")
             put("displayAutoStart", prefs.getString("display_auto_start", "08:00") ?: "08:00")
             put("displayAutoEnd", prefs.getString("display_auto_end", "18:00") ?: "18:00")
+            put("lowRamMode", prefs.getBoolean("low_ram_mode", false))
             put("accessibilityEnabled", RemoteAccessibilityService.isEnabled(this@RemoteService))
         }
         return json.toString()
@@ -613,6 +623,7 @@ class RemoteService : Service(), RemoteHost {
             if (json.has("displayMode")) editor.putString("display_mode", json.getString("displayMode"))
             if (json.has("displayAutoStart")) editor.putString("display_auto_start", json.getString("displayAutoStart"))
             if (json.has("displayAutoEnd")) editor.putString("display_auto_end", json.getString("displayAutoEnd"))
+            if (json.has("lowRamMode")) editor.putBoolean("low_ram_mode", json.getBoolean("lowRamMode"))
             editor.apply()
             val main = MainActivity.activeInstance?.get()
             main?.resetIdleTimer()

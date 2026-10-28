@@ -75,7 +75,10 @@ class MainActivity : Activity() {
     private val driftRunnable = object : Runnable {
         override fun run() {
             if (screensaverPanel.visibility == View.VISIBLE) {
-                animateClockDrift()
+                val isLowRam = prefs.getBoolean("low_ram_mode", false)
+                if (!isLowRam) {
+                    animateClockDrift()
+                }
                 driftHandler.postDelayed(this, 12_000L)
             }
         }
@@ -87,7 +90,7 @@ class MainActivity : Activity() {
     }
 
     private val prefChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == "user_name" || key == "clock_is_12h" || key == "clock_show_seconds" || key == "clock_show_date" || key == "favorite_pkgs_json" || key == "hidden_pkgs_json" || key == "app_rename_map" || key == "app_category_map" || key == "group_by_category" || key == "app_launch_counts" || key == "app_sort_mode" || key == "display_mode" || key == "display_auto_start" || key == "display_auto_end") {
+        if (key == "user_name" || key == "clock_is_12h" || key == "clock_show_seconds" || key == "clock_show_date" || key == "favorite_pkgs_json" || key == "hidden_pkgs_json" || key == "app_rename_map" || key == "app_category_map" || key == "group_by_category" || key == "app_launch_counts" || key == "app_sort_mode" || key == "display_mode" || key == "display_auto_start" || key == "display_auto_end" || key == "low_ram_mode") {
             runOnUiThread {
                 try {
                     settingsApplier.applySettings()
@@ -258,6 +261,33 @@ class MainActivity : Activity() {
         try { loadApps() } catch (_: Exception) {}
         try { startRemoteService() } catch (_: Exception) {}
         try { requestNotificationPermissionIfNeeded() } catch (_: Exception) {}
+        try { checkAndSuggestLowRamMode() } catch (_: Exception) {}
+    }
+
+    private fun checkAndSuggestLowRamMode() {
+        if (prefs.contains("low_ram_dismissed") || prefs.getBoolean("low_ram_mode", false)) return
+        val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return
+        val memInfo = ActivityManager.MemoryInfo()
+        am.getMemoryInfo(memInfo)
+
+        val isLowRam = am.isLowRamDevice || memInfo.lowMemory || (memInfo.availMem < memInfo.threshold)
+        if (isLowRam) {
+            AlertDialog.Builder(this)
+                .setTitle("Low-RAM Device Detected")
+                .setMessage("Would you like to enable Low-RAM Mode for smoother performance and reduced memory footprint?")
+                .setPositiveButton("Enable") { _, _ ->
+                    prefs.edit().putBoolean("low_ram_mode", true).putBoolean("low_ram_dismissed", true).apply()
+                    reloadAppsAndRefresh()
+                }
+                .setNegativeButton("Not Now") { _, _ ->
+                    prefs.edit().putBoolean("low_ram_dismissed", true).apply()
+                }
+                .show()
+        }
+    }
+
+    fun openSearchPanel() {
+        searchPanelManager.open()
     }
 
     fun launch(e: AppEntry) {
@@ -385,7 +415,7 @@ class MainActivity : Activity() {
         val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
         val memInfo = ActivityManager.MemoryInfo()
         am?.getMemoryInfo(memInfo)
-        val ramMb = (memInfo?.totalMem ?: 0L) / (1024 * 1024)
+        val ramMb = (memInfo.totalMem) / (1024 * 1024)
 
         val summary = "Device Model: ${Build.MANUFACTURER} ${Build.MODEL}\n" +
                 "Android Version: ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})\n" +

@@ -44,6 +44,7 @@ interface RemoteHost {
     fun cancelSleepTimer(): Boolean
     fun toggleSetupPattern(): Boolean
     fun toggleControlCenter(): String?
+    fun openSearch(): String?
     fun getDeviceReport(includeUserApps: Boolean): String
     fun getKeyLogJson(): String
     fun clearKeyLog(): Boolean
@@ -206,6 +207,14 @@ class RemoteServer(private val pin: String, private val host: RemoteHost) {
                             reply(out, 200, "text/plain", "ok".toByteArray())
                         } else {
                             reply(out, 400, "text/plain", err.toByteArray(Charsets.UTF_8))
+                        }
+                    }
+                    "/opensearch" -> {
+                        val err = host.openSearch()
+                        if (err == null) {
+                            reply(out, 200, "text/plain", "ok".toByteArray())
+                        } else {
+                            reply(out, 409, "text/plain", err.toByteArray(Charsets.UTF_8))
                         }
                     }
                     "/nowplaying" -> {

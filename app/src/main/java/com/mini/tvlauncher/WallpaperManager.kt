@@ -45,8 +45,9 @@ class WallpaperManager(
     private val slideshowRunnable = object : Runnable {
         override fun run() {
             performSlideshowTransition()
+            val isLowRam = prefs.getBoolean("low_ram_mode", false)
             val minutes = prefs.getInt("wallpaper_slideshow_interval", 0)
-            if (minutes > 0) {
+            if (!isLowRam && minutes > 0) {
                 slideshowHandler.postDelayed(this, minutes * 60 * 1000L)
             }
         }
@@ -54,8 +55,9 @@ class WallpaperManager(
 
     fun start() {
         slideshowHandler.removeCallbacks(slideshowRunnable)
+        val isLowRam = prefs.getBoolean("low_ram_mode", false)
         val intervalMinutes = prefs.getInt("wallpaper_slideshow_interval", 0)
-        if (intervalMinutes > 0) {
+        if (!isLowRam && intervalMinutes > 0) {
             slideshowHandler.postDelayed(slideshowRunnable, intervalMinutes * 60 * 1000L)
         }
     }
@@ -74,13 +76,20 @@ class WallpaperManager(
         slideshowHandler.removeCallbacks(slideshowRunnable)
         val customFiles = AppUtils.getWallpaperFiles(filesDir)
         val isCustom = prefs.getBoolean("custom", false)
+        val isLowRam = prefs.getBoolean("low_ram_mode", false)
 
         val nextBmp: Bitmap?
         val drawable: Drawable?
 
         if (isCustom && customFiles.isNotEmpty()) {
             val file = customFiles[slideshowIndex.coerceIn(0, customFiles.size - 1)]
-            nextBmp = BitmapFactory.decodeFile(file.path)
+            val opts = BitmapFactory.Options().apply {
+                if (isLowRam) {
+                    inPreferredConfig = Bitmap.Config.RGB_565
+                    inSampleSize = 2
+                }
+            }
+            nextBmp = BitmapFactory.decodeFile(file.path, opts)
             drawable = if (nextBmp != null) BitmapDrawable(activity.resources, nextBmp) else null
         } else {
             nextBmp = null
@@ -100,12 +109,15 @@ class WallpaperManager(
         }
 
         val intervalMinutes = prefs.getInt("wallpaper_slideshow_interval", 0)
-        if (intervalMinutes > 0) {
+        if (!isLowRam && intervalMinutes > 0) {
             slideshowHandler.postDelayed(slideshowRunnable, intervalMinutes * 60 * 1000L)
         }
     }
 
     private fun performSlideshowTransition() {
+        val isLowRam = prefs.getBoolean("low_ram_mode", false)
+        if (isLowRam) return
+
         val customFiles = AppUtils.getWallpaperFiles(filesDir)
         val isCustom = prefs.getBoolean("custom", false)
 
