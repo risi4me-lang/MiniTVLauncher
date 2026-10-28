@@ -36,6 +36,12 @@ class RemoteAccessibilityService : AccessibilityService() {
         }
     }
 
+    val controlCenterOverlayManager by lazy { ControlCenterOverlayManager(this) }
+
+    fun showBlackOverlayFallback() {
+        controlCenterOverlayManager.showBlackOverlay()
+    }
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this

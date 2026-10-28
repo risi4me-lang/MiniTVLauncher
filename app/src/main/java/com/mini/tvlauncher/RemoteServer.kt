@@ -37,9 +37,15 @@ interface RemoteHost {
     fun resetCardImage(pkg: String): Boolean
     fun resetUsageStats(): Boolean
     fun getAppIconPng(pkg: String): ByteArray?
+    fun getNowPlayingJson(): String
+    fun handleMediaAction(action: String, posParam: String?): Boolean
+    fun getSleepStatusJson(): String
+    fun setSleepTimer(minutes: Int, videoEnd: Boolean): Boolean
+    fun cancelSleepTimer(): Boolean
+    fun toggleSetupPattern(): Boolean
+    fun toggleControlCenter(): String?
 }
 
-/** Tiny dependency-free HTTP server. Access requires valid device key or PIN. */
 class RemoteServer(private val pin: String, private val host: RemoteHost) {
     private var server: ServerSocket? = null
     private val pool = Executors.newFixedThreadPool(4)
@@ -145,7 +151,6 @@ class RemoteServer(private val pin: String, private val host: RemoteHost) {
                     return
                 }
 
-                // Auth check: device key OR PIN
                 val providedKey = q["key"] ?: reqHeaderKey
                 val providedPin = q["pin"]
                 val isAuth = (providedKey != null && host.isValidKey(providedKey)) || (providedPin == pin)
@@ -188,6 +193,41 @@ class RemoteServer(private val pin: String, private val host: RemoteHost) {
                     }
                     "/voice" -> {
                         val err = host.triggerVoice()
+                        if (err == null) {
+                            reply(out, 200, "text/plain", "ok".toByteArray())
+                        } else {
+                            reply(out, 400, "text/plain", err.toByteArray(Charsets.UTF_8))
+                        }
+                    }
+                    "/nowplaying" -> {
+                        reply(out, 200, "application/json", host.getNowPlayingJson().toByteArray(Charsets.UTF_8))
+                    }
+                    "/media" -> {
+                        val act = q["a"] ?: q["action"] ?: ""
+                        val pos = q["pos"]
+                        val ok = host.handleMediaAction(act, pos)
+                        reply(out, if (ok) 200 else 400, "text/plain", "ok".toByteArray())
+                    }
+                    "/sleep/status" -> {
+                        reply(out, 200, "application/json", host.getSleepStatusJson().toByteArray(Charsets.UTF_8))
+                    }
+                    "/sleep" -> {
+                        val minStr = q["min"] ?: q["m"] ?: ""
+                        val isVideoEnd = minStr == "video_end"
+                        val mins = minStr.toIntOrNull() ?: 15
+                        val ok = host.setSleepTimer(mins, isVideoEnd)
+                        reply(out, if (ok) 200 else 400, "text/plain", "ok".toByteArray())
+                    }
+                    "/sleep/cancel" -> {
+                        val ok = host.cancelSleepTimer()
+                        reply(out, if (ok) 200 else 400, "text/plain", "ok".toByteArray())
+                    }
+                    "/setup" -> {
+                        val ok = host.toggleSetupPattern()
+                        reply(out, if (ok) 200 else 400, "text/plain", "ok".toByteArray())
+                    }
+                    "/controlcenter" -> {
+                        val err = host.toggleControlCenter()
                         if (err == null) {
                             reply(out, 200, "text/plain", "ok".toByteArray())
                         } else {

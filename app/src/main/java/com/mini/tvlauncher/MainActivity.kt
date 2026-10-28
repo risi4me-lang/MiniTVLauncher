@@ -369,7 +369,6 @@ class MainActivity : Activity() {
         super.onDestroy()
     }
 
-    // ---- Key Tester Methods ----
     private fun openKeyTesterPanel() {
         keyTesterPanel.visibility = View.VISIBLE
         findViewById<View>(R.id.closeKeyTesterPanelBtn).requestFocus()
@@ -380,7 +379,6 @@ class MainActivity : Activity() {
         toolsRow.requestFocus()
     }
 
-    // ---- Default Home Request ----
     private fun openDefaultHomeChooser() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -398,7 +396,6 @@ class MainActivity : Activity() {
         }
     }
 
-    // ---- Delegated Search & Pairing Methods ----
     fun isSearchPanelOpen(): Boolean = searchPanelManager.isOpen()
 
     fun handleLiveTypeFromRemote(text: String, action: String) {
@@ -435,6 +432,14 @@ class MainActivity : Activity() {
                 "pair_phone" -> qrPairingManager.openPairingPanel()
                 "default_home" -> openDefaultHomeChooser()
                 "key_tester" -> openKeyTesterPanel()
+                "projector_setup" -> startActivity(Intent(this, ProjectorSetupActivity::class.java))
+                "media_access" -> {
+                    try {
+                        startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    } catch (_: Exception) {
+                        Toast.makeText(this, "Enable via ADB: adb shell cmd notification allow_listener ...", Toast.LENGTH_LONG).show()
+                    }
+                }
                 else -> {
                     try {
                         tile.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -498,7 +503,6 @@ class MainActivity : Activity() {
         }
     }
 
-    // ---- Favorites & Hidden Management ----
     private fun getFavoritePkgs(): List<String> {
         val jsonStr = prefs.getString("favorite_pkgs_json", "[]") ?: "[]"
         return try {
@@ -593,7 +597,6 @@ class MainActivity : Activity() {
         } catch (_: Exception) {}
     }
 
-    // ---- App Options Context Menu ----
     private fun showAppContextMenu(appEntry: AppEntry, anchorView: View) {
         val isFav = getFavoritePkgs().contains(appEntry.pkg)
         val favActionText = if (isFav) "Unpin from favorites" else "Pin to favorites"
@@ -702,7 +705,6 @@ class MainActivity : Activity() {
         }
     }
 
-    // ---- Hidden Apps Screen / Panel ----
     private fun openHiddenAppsPanel() {
         refreshHiddenAppsUi()
         val panel = findViewById<View>(R.id.hiddenAppsPanel)
@@ -766,6 +768,8 @@ class MainActivity : Activity() {
         }
 
         result.add(ToolTile("power", "Power", R.drawable.ic_tool_power, Intent()))
+        result.add(ToolTile("projector_setup", "Projector Setup", R.drawable.ic_tool_display, Intent(this, ProjectorSetupActivity::class.java)))
+        result.add(ToolTile("media_access", "Enable Media Access", R.drawable.ic_tool_settings, Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)))
         result.add(ToolTile("default_home", "Default Home", R.drawable.ic_tool_launcher, Intent()))
         result.add(ToolTile("key_tester", "Key Tester", R.drawable.ic_tool_settings, Intent()))
 

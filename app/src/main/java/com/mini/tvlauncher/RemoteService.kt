@@ -26,6 +26,12 @@ class RemoteService : Service(), RemoteHost {
         @Volatile var serverPort: Int = 0
             private set
 
+        @Volatile var sleepTimerManager: SleepTimerManager? = null
+            private set
+
+        @Volatile var nowPlayingManager: NowPlayingManager? = null
+            private set
+
         fun startService(context: Context) {
             val intent = Intent(context, RemoteService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -42,6 +48,11 @@ class RemoteService : Service(), RemoteHost {
     override fun onCreate() {
         super.onCreate()
         startForegroundSafely()
+
+        val npm = NowPlayingManager(this).also { it.start() }
+        nowPlayingManager = npm
+        sleepTimerManager = SleepTimerManager(this, prefs, npm).also { it.restoreIfSaved() }
+
         startServer()
     }
 
@@ -57,6 +68,9 @@ class RemoteService : Service(), RemoteHost {
         server?.stop()
         server = null
         serverPort = 0
+        nowPlayingManager?.stop()
+        nowPlayingManager = null
+        sleepTimerManager = null
         super.onDestroy()
     }
 
@@ -66,9 +80,7 @@ class RemoteService : Service(), RemoteHost {
         try {
             createNotificationChannel()
             startForeground(NOTIF_ID, buildNotification())
-        } catch (_: Exception) {
-            // Handle missing POST_NOTIFICATIONS permission on Android 13+
-        }
+        } catch (_: Exception) {}
     }
 
     private fun startServer() {
@@ -114,6 +126,47 @@ class RemoteService : Service(), RemoteHost {
     }
 
     // ---- RemoteHost Implementation ----
+    override fun getNowPlayingJson(): String {
+        return nowPlayingManager?.getNowPlayingJson() ?: "{}"
+    }
+
+    override fun handleMediaAction(action: String, posParam: String?): Boolean {
+        return nowPlayingManager?.handleMediaAction(action, posParam) ?: false
+    }
+
+    override fun getSleepStatusJson(): String {
+        return sleepTimerManager?.getSleepStatusJson() ?: "{}"
+    }
+
+    override fun setSleepTimer(minutes: Int, videoEnd: Boolean): Boolean {
+        val stm = sleepTimerManager ?: return false
+        if (videoEnd) {
+            stm.startVideoEndTimer()
+        } else {
+            stm.startTimerMinutes(minutes)
+        }
+        return true
+    }
+
+    override fun cancelSleepTimer(): Boolean {
+        sleepTimerManager?.cancelTimer()
+        return true
+    }
+
+    override fun toggleSetupPattern(): Boolean {
+        ProjectorSetupActivity.toggleOrNextPattern()
+        return true
+    }
+
+    override fun toggleControlCenter(): String? {
+        val acc = RemoteAccessibilityService.instance
+        if (acc != null) {
+            acc.controlCenterOverlayManager.toggleOrShow()
+            return null
+        }
+        return "Please enable Mini Launcher Remote Service in Accessibility Settings"
+    }
+
     override fun apps(): List<AppEntry> {
         val pm = packageManager
         val seen = HashSet<String>()

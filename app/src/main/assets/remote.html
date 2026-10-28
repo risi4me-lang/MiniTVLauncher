@@ -81,12 +81,6 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
 .app-info { display: flex; flex-direction: column; overflow: hidden; margin-right: 12px; }
 .app-name { font-size: 15px; font-weight: 500; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app-meta { font-size: 12px; color: #7080a0; margin-top: 2px; }
-.app-action-icon { color: #7080a0; }
-.app-action-icon svg { width: 20px; height: 20px; fill: currentColor; }
-
-.check-row { display: flex; align-items: center; justify-content: space-between; min-height: 48px; border-bottom: 1px solid var(--glass-border); }
-.check-row:last-child { border-bottom: none; }
-.check-row input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--accent); }
 
 #loginView { max-width: 360px; margin: 60px auto; text-align: center; padding: 24px; background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--glass-border); border-radius: 24px; }
 </style>
@@ -105,6 +99,37 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
 
   <!-- Remote Tab -->
   <div id="view-remote" class="view">
+
+    <!-- Now Playing Glass Card -->
+    <div id="nowPlayingCard" class="card" style="display:none">
+      <div style="display:flex;align-items:center;gap:12px">
+        <img id="npAppIcon" style="width:40px;height:40px;border-radius:10px;object-fit:cover;background:rgba(255,255,255,0.1)">
+        <div style="overflow:hidden;flex:1">
+          <div id="npTitle" style="font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">--</div>
+          <div id="npArtist" style="font-size:12px;color:#a0b0d0;margin-top:2px">--</div>
+        </div>
+      </div>
+      <input type="range" id="npProgress" min="0" max="100" value="0" style="width:100%;margin-top:10px" onchange="seekMedia(this.value)">
+      <div style="display:flex;justify-content:space-around;margin-top:8px">
+        <button onclick="mediaAct('seek_back')" class="btn-text">⏮ -10s</button>
+        <button onclick="mediaAct('prev')" class="btn-text">⏮ Prev</button>
+        <button onclick="mediaAct('toggle')" id="npPlayBtn" class="btn-text" style="font-size:16px;font-weight:bold">▶ Play</button>
+        <button onclick="mediaAct('next')" class="btn-text">Next ⏭</button>
+        <button onclick="mediaAct('seek_fwd')" class="btn-text">+10s ⏭</button>
+      </div>
+    </div>
+
+    <!-- Sleep Timer Countdown Banner -->
+    <div id="sleepCard" class="card" style="display:none;background:rgba(255,100,100,0.15)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span id="sleepTimerText" style="font-size:14px;font-weight:600">Sleep Timer: --</span>
+        <div>
+          <button onclick="addSleep(15)" class="btn-text">+15m</button>
+          <button onclick="cancelSleep()" class="btn-text" style="color:#ff6b6b;margin-left:8px">Cancel</button>
+        </div>
+      </div>
+    </div>
+
     <div class="dpad-grid" oncontextmenu="return false;">
       <span></span><button id="btnUp" class="btn-remote"><svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg></button><span></span>
       <button id="btnLeft" class="btn-remote"><svg viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6z"/></svg></button>
@@ -131,18 +156,8 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
     </div>
 
     <div class="tools-row">
-      <button onclick="openSheet('toolsSheet')" class="btn-open-tools">
-        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 14H4v-4h11v4zm0-5H4V9h11v4zm5 5h-4V9h4v9z"/></svg>
-        Type / Link
-      </button>
-      <button onclick="openSheet('searchSheet')" class="btn-open-tools">
-        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-        Search
-      </button>
-      <button onclick="triggerVoice()" class="btn-open-tools">
-        <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.49 6-3.31 6-6.72h-1.7z"/></svg>
-        Voice
-      </button>
+      <button onclick="toggleCC()" class="btn-open-tools">Control Center</button>
+      <button onclick="toggleSetup()" class="btn-open-tools">Setup Pattern</button>
     </div>
 
     <!-- Quick Apps Grid Section -->
@@ -162,108 +177,25 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
   <!-- Settings Tab -->
   <div id="view-settings" class="view">
     <div class="card">
+      <label class="section-title">Sleep Timer</label>
+      <select id="sleepChoice" class="select-field" onchange="setSleep(this.value)">
+        <option value="0">Off</option>
+        <option value="15">15 minutes</option>
+        <option value="30">30 minutes</option>
+        <option value="45">45 minutes</option>
+        <option value="60">60 minutes</option>
+        <option value="90">90 minutes</option>
+        <option value="120">120 minutes</option>
+        <option value="video_end">End of this video</option>
+      </select>
+    </div>
+
+    <div class="card">
       <div style="margin-bottom:12px">
         <label class="section-title">Your Name</label>
         <input type="text" id="userName" class="input-field" placeholder="Enter name">
       </div>
-      <div style="margin-bottom:12px">
-        <label class="section-title">Clock Format</label>
-        <select id="is12h" class="select-field">
-          <option value="true">12-hour (1:30 PM)</option>
-          <option value="false">24-hour (13:30)</option>
-        </select>
-      </div>
-      <div class="check-row">
-        <span>Show Seconds</span>
-        <input type="checkbox" id="showSeconds">
-      </div>
-      <div class="check-row">
-        <span>Show Date</span>
-        <input type="checkbox" id="showDate">
-      </div>
-      <div class="check-row">
-        <span>Group Apps by Category</span>
-        <input type="checkbox" id="groupByCategory">
-      </div>
-      <div style="margin-top:12px">
-        <label class="section-title">Display Mode</label>
-        <select id="displayMode" class="select-field">
-          <option value="standard">Standard</option>
-          <option value="bright">Bright Room</option>
-          <option value="auto">Auto (Configurable Time)</option>
-        </select>
-      </div>
-      <div style="margin-top:8px;display:flex;gap:8px">
-        <div style="flex:1">
-          <label class="section-title">Auto Start</label>
-          <input type="time" id="displayAutoStart" class="input-field" value="08:00">
-        </div>
-        <div style="flex:1">
-          <label class="section-title">Auto End</label>
-          <input type="time" id="displayAutoEnd" class="input-field" value="18:00">
-        </div>
-      </div>
-      <div style="margin-top:12px">
-        <label class="section-title">Sort Apps By</label>
-        <select id="sortMode" class="select-field">
-          <option value="alphabetical">A-Z (Alphabetical)</option>
-          <option value="most_used">Most Used</option>
-        </select>
-      </div>
-      <div style="margin-top:12px">
-        <label class="section-title">Home QR Code</label>
-        <select id="homeQrMode" class="select-field">
-          <option value="always">Always Show</option>
-          <option value="until_paired">Until a phone is paired</option>
-          <option value="off">Off</option>
-        </select>
-      </div>
       <button onclick="saveSettings()" class="btn">Save Settings</button>
-      <button onclick="resetUsageStats()" class="btn btn-secondary">Reset Usage Stats</button>
-    </div>
-
-    <div class="card">
-      <label class="section-title">Weather City</label>
-      <input type="text" id="weatherCity" class="input-field" placeholder="e.g. London, New Delhi, New York">
-      <div style="margin-top:10px">
-        <label class="section-title">Temperature Unit</label>
-        <select id="weatherUnit" class="select-field" onchange="saveSettings()">
-          <option value="c">°C (Celsius)</option>
-          <option value="f">°F (Fahrenheit)</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="card">
-      <label class="section-title">Wallpaper Slideshow</label>
-      <select id="slideshowInterval" class="select-field" onchange="saveSettings()">
-        <option value="0">Off (Static Wallpaper)</option>
-        <option value="5">Every 5 minutes</option>
-        <option value="15">Every 15 minutes</option>
-        <option value="30">Every 30 minutes</option>
-        <option value="60">Every 60 minutes</option>
-      </select>
-    </div>
-
-    <div class="card">
-      <label class="section-title">In-Launcher Screensaver</label>
-      <select id="screensaverTimeout" class="select-field" onchange="saveSettings()">
-        <option value="0">Off</option>
-        <option value="5">After 5 minutes</option>
-        <option value="10">After 10 minutes</option>
-        <option value="20">After 20 minutes</option>
-      </select>
-    </div>
-
-    <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <label class="section-title" style="margin:0">Uploaded Wallpapers (<span id="wpCount">0</span>/8)</label>
-      </div>
-      <div id="wallpaperList" style="margin-bottom:12px"></div>
-      <label id="btnUploadWp" class="btn btn-secondary">
-        Upload Custom Wallpaper
-        <input type="file" accept="image/*" id="wp" onchange="up(this)" style="display:none">
-      </label>
     </div>
   </div>
 
@@ -272,116 +204,20 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
 <!-- Glass Tab Bar -->
 <div class="tab-bar">
   <button class="tab-item active" data-tab="remote" onclick="setTab('remote')">
-    <svg viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 3c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm0 13c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm3-5.5H9v-1.5h6v1.5zm0-3H9V9h6v1.5z"/></svg>
     Remote
   </button>
   <button class="tab-item" data-tab="apps" onclick="setTab('apps')">
-    <svg viewBox="0 0 24 24"><path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"/></svg>
     Apps
   </button>
   <button class="tab-item" data-tab="settings" onclick="setTab('settings')">
-    <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
     Settings
   </button>
-</div>
-
-<!-- Backdrop -->
-<div id="backdrop" class="sheet-backdrop" onclick="closeSheets()"></div>
-
-<!-- Search & Live Typing Bottom Sheet -->
-<div id="searchSheet" class="sheet">
-  <div class="sheet-header">
-    <span class="sheet-title">Search & Live Type</span>
-    <button class="sheet-close" onclick="closeSheets()"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
-  </div>
-  <div class="card">
-    <label class="section-title">Type Text Live</label>
-    <input type="text" id="liveTypeInput" class="input-field" placeholder="Type text, search movie or app..." oninput="onLiveTypeInput(event)">
-    <div style="display:flex;gap:8px;margin-top:10px">
-      <button onclick="sendLiveTypeAction('enter')" class="btn" style="flex:2">Enter / Search</button>
-      <button onclick="sendLiveTypeAction('clear')" class="btn btn-secondary" style="flex:1">Clear</button>
-    </div>
-  </div>
-</div>
-
-<!-- Tools Bottom Sheet (Send Link) -->
-<div id="toolsSheet" class="sheet">
-  <div class="sheet-header">
-    <span class="sheet-title">Send Link to TV</span>
-    <button class="sheet-close" onclick="closeSheets()"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
-  </div>
-  <div class="card">
-    <label class="section-title">Send Web Link</label>
-    <input type="text" id="linkInput" class="input-field" placeholder="https://youtube.com/watch?v=...">
-    <button onclick="sendLink()" class="btn">Send Link</button>
-  </div>
-</div>
-
-<!-- Edit Quick Apps Bottom Sheet -->
-<div id="editQuickSheet" class="sheet">
-  <div class="sheet-header">
-    <span class="sheet-title">Edit Quick Apps</span>
-    <button class="sheet-close" onclick="closeSheets()"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
-  </div>
-  <div id="editQuickAppsList" style="margin-bottom:12px"></div>
-  <button onclick="saveQuickAppsSelection()" class="btn">Save Selection</button>
-  <button onclick="resetQuickAppsSelection()" class="btn btn-secondary">Reset to Default</button>
-</div>
-
-<!-- App Action Bottom Sheet -->
-<div id="appSheet" class="sheet">
-  <div class="sheet-header">
-    <div>
-      <div id="appSheetTitle" class="sheet-title">App Name</div>
-      <div id="appSheetPkg" style="font-size:12px;color:#7080a0;margin-top:2px">com.example.pkg</div>
-    </div>
-    <button class="sheet-close" onclick="closeSheets()"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
-  </div>
-
-  <button onclick="sheetAction('launch')" class="btn">Launch App</button>
-  <button id="btnSheetPin" onclick="sheetAction('pin')" class="btn btn-secondary">Pin to Favorites</button>
-  <button id="btnSheetHide" onclick="sheetAction('hide')" class="btn btn-secondary">Hide App</button>
-
-  <div class="card" style="margin-top:12px">
-    <label class="section-title">Category</label>
-    <select id="appCatSelect" class="select-field" onchange="sheetCategoryChange(this)">
-      <option value="">Automatic (Default)</option>
-      <option value="Entertainment">Entertainment</option>
-      <option value="Games">Games</option>
-      <option value="Productivity & Tools">Productivity & Tools</option>
-      <option value="Others">Others</option>
-    </select>
-  </div>
-
-  <div class="card">
-    <label class="section-title">Rename App</label>
-    <input type="text" id="appRenameInput" class="input-field" placeholder="Enter new display name">
-    <div style="display:flex;gap:8px;margin-top:8px">
-      <button onclick="sheetAction('rename')" class="btn" style="flex:1">Save</button>
-      <button onclick="sheetAction('resetRename')" class="btn btn-secondary" style="flex:1">Reset Name</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <label class="section-title">Card Image</label>
-    <label class="btn btn-secondary">
-      Upload Image (480x270)
-      <input type="file" accept="image/*" id="appImgFile" onchange="sheetUploadImg(this)" style="display:none">
-    </label>
-    <button id="btnSheetResetImg" onclick="sheetAction('resetImg')" class="btn btn-danger" style="display:none">Reset Image</button>
-  </div>
 </div>
 
 <script>
 let KEY = localStorage.getItem('device_key') || '';
 let PIN = sessionStorage.getItem('pin') || '';
 let APPS = [], FAVS = [], HIDDEN = [], WALLPAPERS = [];
-
-let keyQueue = [];
-let consecutiveFailures = 0;
-let accEnabled = true;
-let currentApp = null;
-let liveTypeTimer = null;
 
 if (window.PAIRED_KEY) {
   KEY = window.PAIRED_KEY;
@@ -410,764 +246,90 @@ function setTab(tabName) {
   document.querySelectorAll('.view').forEach(v => {
     v.classList.toggle('active', v.id === 'view-' + tabName);
   });
-  localStorage.setItem('activeTab', tabName);
-}
-
-const savedTab = localStorage.getItem('activeTab') || 'remote';
-setTab(savedTab);
-
-function openSheet(id) {
-  document.getElementById('backdrop').classList.add('open');
-  document.getElementById(id).classList.add('open');
-}
-
-function closeSheets() {
-  document.getElementById('backdrop').classList.remove('open');
-  document.querySelectorAll('.sheet').forEach(s => s.classList.remove('open'));
-}
-
-function queueKey(kName) {
-  if (keyQueue.length >= 5) keyQueue.splice(0, keyQueue.length - 4);
-  keyQueue.push(kName);
-}
-
-setInterval(() => {
-  if (keyQueue.length > 0) {
-    const k = keyQueue.shift();
-    sendKeyRequest(k);
-  }
-}, 83);
-
-function sendKeyRequest(kName) {
-  const auth = 'key=' + encodeURIComponent(KEY) + '&pin=' + encodeURIComponent(PIN);
-  const url = '/key?k=' + encodeURIComponent(kName) + '&' + auth;
-  fetch(url, { method: 'POST' }).then(r => {
-    if (r.ok) {
-      consecutiveFailures = 0;
-    } else if (r.status === 401) {
-      handleAuthError();
-    } else {
-      handleConnFailure();
-      r.text().then(errCode => {
-        if (errCode === 'accessibility_off') {
-          showToast('Enable Accessibility Service on TV for controls outside launcher', true);
-        } else if (errCode === 'no_focusable_node' || errCode === 'no_window') {
-          showToast('No focusable item found on screen', true);
-        } else {
-          showToast('Key action failed', true);
-        }
-      }).catch(() => showToast('Key action failed', true));
-    }
-  }).catch(() => handleConnFailure());
-}
-
-function handleConnFailure() {
-  consecutiveFailures++;
-  if (consecutiveFailures >= 3) {
-    showToast('TV not reachable', true);
-  }
-}
-
-function handleAuthError() {
-  if (KEY) { localStorage.removeItem('device_key'); KEY = ''; }
-  sessionStorage.removeItem('pin'); PIN = '';
-  document.getElementById('mainView').style.display = 'none';
-  document.getElementById('loginView').style.display = 'block';
 }
 
 function api(p, o) {
   const auth = 'key=' + encodeURIComponent(KEY) + '&pin=' + encodeURIComponent(PIN);
   const url = p + (p.includes('?') ? '&' : '?') + auth;
-  return fetch(url, o).then(r => {
-    if (r.status === 401) {
-      handleAuthError();
-      throw new Error('Unauthorized');
-    } else {
-      consecutiveFailures = 0;
-    }
-    return r;
-  }).catch(e => {
-    if (e.message !== 'Unauthorized') handleConnFailure();
-    throw e;
-  });
-}
-
-function getIconUrl(pkg) {
-  const auth = 'key=' + encodeURIComponent(KEY) + '&pin=' + encodeURIComponent(PIN);
-  return '/icon?pkg=' + encodeURIComponent(pkg) + '&' + auth;
+  return fetch(url, o);
 }
 
 function start() {
-  api('/apps').then(r => {
-    if (!r.ok) throw 0;
-    return r.json();
-  }).then(a => {
-    if (PIN) sessionStorage.setItem('pin', PIN);
+  api('/apps').then(r => r.json()).then(a => {
     APPS = a;
     document.getElementById('loginView').style.display = 'none';
     document.getElementById('mainView').style.display = 'block';
-    loadFavorites();
-    loadHidden();
-    loadWallpapers();
-    renderApps();
-    renderQuickApps();
-    loadSettings();
-  }).catch(e => {
-    if (e.message !== 'Unauthorized') {
-      sessionStorage.removeItem('pin');
-      showToast('Wrong PIN or Invalid Key', true);
-    }
+    pollNowPlaying();
+    pollSleepStatus();
   });
 }
 
-function checkAccAndWarn() {
-  if (!accEnabled) {
-    showToast('Accessibility disabled on TV (enable in Settings)', true);
-  }
-}
-
-function updateAccDots(enabled) {
-  accEnabled = enabled;
-  ['btnBack', 'btnHome', 'btnPower'].forEach(id => {
-    const btn = document.getElementById(id);
-    if (btn) btn.classList.toggle('has-dot', !enabled);
-  });
-}
-
-function bindHoldRepeat(element, keyName) {
-  let holdTimer = null;
-  let repeatInterval = null;
-
-  function stopRepeat() {
-    if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
-    if (repeatInterval) { clearInterval(repeatInterval); repeatInterval = null; }
-  }
-
-  element.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    stopRepeat();
-    queueKey(keyName);
-    if (navigator.vibrate) navigator.vibrate(15);
-
-    holdTimer = setTimeout(() => {
-      repeatInterval = setInterval(() => {
-        queueKey(keyName);
-        if (navigator.vibrate) navigator.vibrate(10);
-      }, 120);
-    }, 400);
-  });
-
-  element.addEventListener('pointerup', stopRepeat);
-  element.addEventListener('pointercancel', stopRepeat);
-  element.addEventListener('pointerleave', stopRepeat);
-}
-
-bindHoldRepeat(document.getElementById('btnUp'), 'up');
-bindHoldRepeat(document.getElementById('btnDown'), 'down');
-bindHoldRepeat(document.getElementById('btnLeft'), 'left');
-bindHoldRepeat(document.getElementById('btnRight'), 'right');
-bindHoldRepeat(document.getElementById('btnOk'), 'ok');
-
-document.getElementById('btnBack').addEventListener('click', () => { checkAccAndWarn(); queueKey('back'); });
-document.getElementById('btnHome').addEventListener('click', () => { checkAccAndWarn(); queueKey('home'); });
-
-const swipeArea = document.getElementById('swipeArea');
-let startX = 0, startY = 0, startTime = 0;
-let lastStepX = 0, lastStepY = 0;
-let hasMoved = false;
-
-swipeArea.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
-  if (swipeArea.setPointerCapture) { try { swipeArea.setPointerCapture(e.pointerId); } catch (_) {} }
-  startX = e.clientX; startY = e.clientY;
-  lastStepX = startX; lastStepY = startY;
-  startTime = Date.now(); hasMoved = false;
-});
-
-swipeArea.addEventListener('pointermove', (e) => {
-  if (!startTime) return;
-  e.preventDefault();
-  const dx = e.clientX - lastStepX;
-  const dy = e.clientY - lastStepY;
-  if (Math.abs(dx) >= 45 || Math.abs(dy) >= 45) {
-    let dir = '';
-    if (Math.abs(dx) >= Math.abs(dy)) {
-      dir = dx > 0 ? 'right' : 'left';
-      lastStepX += (dx > 0 ? 45 : -45);
+function pollNowPlaying() {
+  api('/nowplaying').then(r => r.json()).then(np => {
+    const card = document.getElementById('nowPlayingCard');
+    if (np.isPlaying || np.title) {
+      card.style.display = 'block';
+      document.getElementById('npTitle').textContent = np.title || 'Playing';
+      document.getElementById('npArtist').textContent = np.artist || '';
+      document.getElementById('npPlayBtn').textContent = np.isPlaying ? '⏸ Pause' : '▶ Play';
+      if (np.pkg) document.getElementById('npAppIcon').src = '/icon?pkg=' + encodeURIComponent(np.pkg) + '&key=' + encodeURIComponent(KEY);
+      if (np.durationMs > 0) {
+        document.getElementById('npProgress').max = np.durationMs;
+        document.getElementById('npProgress').value = np.positionMs;
+      }
     } else {
-      dir = dy > 0 ? 'down' : 'up';
-      lastStepY += (dy > 0 ? 45 : -45);
+      card.style.display = 'none';
     }
-    queueKey(dir);
-    hasMoved = true;
-    if (navigator.vibrate) navigator.vibrate(10);
-  }
-});
-
-function endSwipe(e) {
-  if (!startTime) return;
-  const totalDx = Math.abs(e.clientX - startX);
-  const totalDy = Math.abs(e.clientY - startY);
-  const dt = Date.now() - startTime;
-  if (dt < 250 && totalDx < 15 && totalDy < 15 && !hasMoved) {
-    queueKey('ok');
-    if (navigator.vibrate) navigator.vibrate(15);
-  }
-  startTime = 0;
+  }).catch(() => {}).finally(() => setTimeout(pollNowPlaying, 2000));
 }
-swipeArea.addEventListener('pointerup', endSwipe);
-swipeArea.addEventListener('pointercancel', endSwipe);
+
+function pollSleepStatus() {
+  api('/sleep/status').then(r => r.json()).then(s => {
+    const card = document.getElementById('sleepCard');
+    if (s.active) {
+      card.style.display = 'block';
+      const m = Math.floor(s.remainingSec / 60);
+      const sec = Math.floor(s.remainingSec % 60);
+      document.getElementById('sleepTimerText').textContent = s.isVideoEnd ? 'Sleep: End of video' : `Sleep: ${m}m ${sec}s`;
+    } else {
+      card.style.display = 'none';
+    }
+  }).catch(() => {}).finally(() => setTimeout(pollSleepStatus, 3000));
+}
+
+function mediaAct(act) {
+  api('/media?a=' + act, { method: 'POST' });
+}
+
+function seekMedia(val) {
+  api('/media?a=seek_to&pos=' + val, { method: 'POST' });
+}
+
+function addSleep(m) {
+  api('/sleep?min=' + m, { method: 'POST' });
+}
+
+function cancelSleep() {
+  api('/sleep/cancel', { method: 'POST' });
+}
+
+function setSleep(val) {
+  if (val === '0') cancelSleep();
+  else api('/sleep?min=' + val, { method: 'POST' });
+}
+
+function toggleCC() {
+  api('/controlcenter', { method: 'POST' }).then(r => {
+    if (!r.ok) r.text().then(msg => showToast(msg, true));
+  });
+}
+
+function toggleSetup() {
+  api('/setup', { method: 'POST' });
+}
 
 document.getElementById('btnVolUp').addEventListener('click', () => api('/volume?action=up', { method: 'POST' }));
 document.getElementById('btnVolDown').addEventListener('click', () => api('/volume?action=down', { method: 'POST' }));
 document.getElementById('btnVolMute').addEventListener('click', () => api('/volume?action=mute', { method: 'POST' }));
-
-document.getElementById('btnPower').addEventListener('click', () => {
-  checkAccAndWarn();
-  api('/power', { method: 'POST' }).then(r => {
-    if (!r.ok) showToast('Power menu not supported', true);
-  }).catch(() => showToast('Power menu failed', true));
-});
-
-function sendLink() {
-  const url = document.getElementById('linkInput').value.trim();
-  if (!url) return;
-  if (!url.toLowerCase().startsWith('http://') && !url.toLowerCase().startsWith('https://')) {
-    showToast('Only http and https links allowed', true);
-    return;
-  }
-  api('/openlink?url=' + encodeURIComponent(url), { method: 'POST' }).then(r => {
-    if (r.ok) {
-      document.getElementById('linkInput').value = '';
-      closeSheets();
-      showToast('Link opened on TV');
-    } else {
-      showToast('No app on TV can open link', true);
-    }
-  }).catch(() => showToast('Failed to send link', true));
-}
-
-function onLiveTypeInput(e) {
-  const text = e.target.value;
-  clearTimeout(liveTypeTimer);
-  liveTypeTimer = setTimeout(() => {
-    api('/type?text=' + encodeURIComponent(text), { method: 'POST' });
-  }, 150);
-}
-
-function sendLiveTypeAction(act) {
-  checkAccAndWarn();
-  const input = document.getElementById('liveTypeInput');
-  const text = input.value;
-  if (act === 'clear') {
-    input.value = '';
-    api('/type?text=&action=clear', { method: 'POST' });
-    showToast('Cleared');
-  } else if (act === 'enter') {
-    api('/type?text=' + encodeURIComponent(text) + '&action=enter', { method: 'POST' }).then(r => {
-      if (r.ok) {
-        showToast('Sent');
-        closeSheets();
-      }
-    });
-  }
-}
-
-function triggerVoice() {
-  api('/voice', { method: 'POST' }).then(r => {
-    if (!r.ok) {
-      r.text().then(msg => showToast(msg || 'Use mic on phone keyboard', true))
-       .catch(() => showToast('Use mic on phone keyboard', true));
-    } else {
-      showToast('Voice search opened on TV');
-    }
-  }).catch(() => showToast('Use mic on phone keyboard', true));
-}
-
-function loadFavorites() {
-  api('/favorites').then(r => r.json()).then(data => {
-    FAVS = data;
-    renderApps();
-    renderQuickApps();
-  }).catch(() => {});
-}
-
-function loadHidden() {
-  api('/hidden').then(r => r.json()).then(data => {
-    HIDDEN = data;
-    renderApps();
-    renderQuickApps();
-  }).catch(() => {});
-}
-
-function loadWallpapers() {
-  api('/wallpapers').then(r => r.json()).then(data => {
-    WALLPAPERS = data || [];
-    renderWallpapers();
-  }).catch(() => {});
-}
-
-function renderWallpapers() {
-  const container = document.getElementById('wallpaperList');
-  const countSpan = document.getElementById('wpCount');
-  const uploadBtn = document.getElementById('btnUploadWp');
-
-  if (!container || !countSpan) return;
-
-  container.innerHTML = '';
-  countSpan.textContent = WALLPAPERS.length;
-
-  if (WALLPAPERS.length >= 8) {
-    uploadBtn.style.opacity = '0.5';
-    uploadBtn.style.pointerEvents = 'none';
-  } else {
-    uploadBtn.style.opacity = '1';
-    uploadBtn.style.pointerEvents = 'auto';
-  }
-
-  if (WALLPAPERS.length === 0) {
-    container.innerHTML = '<div style="font-size:13px;color:#7080a0">No custom wallpapers uploaded yet</div>';
-    return;
-  }
-
-  WALLPAPERS.forEach(wp => {
-    const item = document.createElement('div');
-    item.className = 'app-item';
-
-    const info = document.createElement('div');
-    info.className = 'app-info';
-
-    const name = document.createElement('div');
-    name.className = 'app-name';
-    name.textContent = wp.filename || wp.id;
-
-    info.appendChild(name);
-    item.appendChild(info);
-
-    const delBtn = document.createElement('button');
-    delBtn.className = 'btn btn-danger';
-    delBtn.style.width = 'auto';
-    delBtn.style.minHeight = '36px';
-    delBtn.style.padding = '0 12px';
-    delBtn.style.fontSize = '12px';
-    delBtn.style.marginTop = '0';
-    delBtn.textContent = 'Delete';
-    delBtn.onclick = function(e) {
-      e.stopPropagation();
-      deleteWp(wp.id);
-    };
-
-    item.appendChild(delBtn);
-    container.appendChild(item);
-  });
-}
-
-function deleteWp(id) {
-  api('/wallpaper/delete?id=' + encodeURIComponent(id), { method: 'POST' }).then(r => {
-    if (r.ok) {
-      showToast('Wallpaper deleted');
-      start();
-    } else {
-      showToast('Failed to delete wallpaper', true);
-    }
-  }).catch(() => showToast('Failed to delete wallpaper', true));
-}
-
-function renderQuickApps() {
-  const container = document.getElementById('quickAppsGrid');
-  if (!container) return;
-  container.innerHTML = '';
-
-  const hiddenPkgs = HIDDEN.map(h => h.pkg);
-  let quickList = [];
-
-  const storedCustom = localStorage.getItem('quick_apps_pkgs');
-  if (storedCustom) {
-    try {
-      const customPkgs = JSON.parse(storedCustom);
-      quickList = customPkgs.map(pkg => APPS.find(a => a.pkg === pkg)).filter(a => a && !hiddenPkgs.includes(a.pkg));
-    } catch (_) {}
-  }
-
-  if (quickList.length === 0) {
-    const favApps = FAVS.filter(f => !hiddenPkgs.includes(f.pkg));
-    if (favApps.length > 0) {
-      quickList = favApps;
-    } else {
-      quickList = APPS.filter(a => !hiddenPkgs.includes(a.pkg))
-                      .sort((a, b) => (b.launches || 0) - (a.launches || 0))
-                      .slice(0, 6);
-    }
-  }
-
-  quickList.forEach(app => {
-    const tile = document.createElement('div');
-    tile.className = 'quick-tile';
-    tile.onclick = () => {
-      showToast('Opening ' + app.label + '...');
-      api('/launch?pkg=' + encodeURIComponent(app.pkg), { method: 'POST' });
-    };
-
-    const img = document.createElement('img');
-    img.className = 'quick-tile-icon';
-    img.alt = app.label;
-    img.loading = 'lazy';
-    img.src = getIconUrl(app.pkg);
-
-    img.onerror = function() {
-      const fallback = document.createElement('div');
-      fallback.className = 'quick-tile-icon';
-      fallback.textContent = (app.label || '?').charAt(0).toUpperCase();
-      img.replaceWith(fallback);
-    };
-
-    const name = document.createElement('div');
-    name.className = 'quick-tile-name';
-    name.textContent = app.label;
-
-    tile.appendChild(img);
-    tile.appendChild(name);
-    container.appendChild(tile);
-  });
-}
-
-function openEditQuickApps() {
-  const container = document.getElementById('editQuickAppsList');
-  container.innerHTML = '';
-
-  const storedCustom = localStorage.getItem('quick_apps_pkgs');
-  let selectedPkgs = [];
-  if (storedCustom) {
-    try { selectedPkgs = JSON.parse(storedCustom); } catch (_) {}
-  } else {
-    selectedPkgs = FAVS.map(f => f.pkg);
-  }
-
-  const hiddenPkgs = HIDDEN.map(h => h.pkg);
-  const visibleApps = APPS.filter(a => !hiddenPkgs.includes(a.pkg));
-
-  visibleApps.forEach(app => {
-    const row = document.createElement('div');
-    row.className = 'check-row';
-
-    const span = document.createElement('span');
-    span.textContent = app.label;
-
-    const chk = document.createElement('input');
-    chk.type = 'checkbox';
-    chk.checked = selectedPkgs.includes(app.pkg);
-    chk.dataset.pkg = app.pkg;
-
-    row.appendChild(span);
-    row.appendChild(chk);
-    container.appendChild(row);
-  });
-
-  openSheet('editQuickSheet');
-}
-
-function saveQuickAppsSelection() {
-  const chks = document.querySelectorAll('#editQuickAppsList input[type=checkbox]');
-  const selected = [];
-  chks.forEach(c => {
-    if (c.checked) selected.push(c.dataset.pkg);
-  });
-  localStorage.setItem('quick_apps_pkgs', JSON.stringify(selected));
-  renderQuickApps();
-  closeSheets();
-  showToast('Quick apps saved');
-}
-
-function resetQuickAppsSelection() {
-  localStorage.removeItem('quick_apps_pkgs');
-  renderQuickApps();
-  closeSheets();
-  showToast('Reset to default Quick apps');
-}
-
-function openAppSheet(pkg) {
-  const app = APPS.find(a => a.pkg === pkg);
-  if (!app) return;
-  currentApp = app;
-
-  document.getElementById('appSheetTitle').textContent = app.label;
-  document.getElementById('appSheetPkg').textContent = app.pkg + ' • Launches: ' + (app.launches || 0);
-  document.getElementById('appRenameInput').value = app.label;
-
-  const isFav = FAVS.some(f => f.pkg === pkg);
-  const isHid = HIDDEN.some(h => h.pkg === pkg);
-
-  document.getElementById('btnSheetPin').textContent = isFav ? 'Unpin from Favorites' : 'Pin to Favorites';
-  document.getElementById('btnSheetHide').textContent = isHid ? 'Unhide App' : 'Hide App';
-  document.getElementById('btnSheetResetImg').style.display = app.hasCustomImage ? 'block' : 'none';
-
-  openSheet('appSheet');
-}
-
-function sheetCategoryChange(select) {
-  if (!currentApp) return;
-  const pkg = currentApp.pkg;
-  const val = select.value;
-  api('/category', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pkg: pkg, category: val })
-  }).then(r => {
-    if (r.ok) { showToast('Category updated'); start(); closeSheets(); }
-  });
-}
-
-function sheetAction(act) {
-  if (!currentApp) return;
-  const pkg = currentApp.pkg;
-
-  if (act === 'launch') {
-    api('/launch?pkg=' + encodeURIComponent(pkg), { method: 'POST' }).then(r => {
-      if (r.ok) showToast('Launched ' + currentApp.label);
-      closeSheets();
-    });
-  } else if (act === 'pin') {
-    const isFav = FAVS.some(f => f.pkg === pkg);
-    api('/favorites', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pkg: pkg, pinned: !isFav })
-    }).then(r => {
-      if (r.ok) { showToast(isFav ? 'Unpinned' : 'Pinned'); start(); closeSheets(); }
-    });
-  } else if (act === 'hide') {
-    const isHid = HIDDEN.some(h => h.pkg === pkg);
-    api('/hidden', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pkg: pkg, hidden: !isHid })
-    }).then(r => {
-      if (r.ok) { showToast(isHid ? 'Unhidden' : 'Hidden'); start(); closeSheets(); }
-    });
-  } else if (act === 'rename') {
-    const newName = document.getElementById('appRenameInput').value.trim();
-    api('/rename', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pkg: pkg, name: newName })
-    }).then(r => {
-      if (r.ok) { showToast('Renamed'); start(); closeSheets(); }
-    });
-  } else if (act === 'resetRename') {
-    api('/rename', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pkg: pkg, name: '' })
-    }).then(r => {
-      if (r.ok) { showToast('Name reset'); start(); closeSheets(); }
-    });
-  } else if (act === 'resetImg') {
-    api('/cardimage?pkg=' + encodeURIComponent(pkg) + '&action=reset', { method: 'POST' }).then(r => {
-      if (r.ok) { showToast('Image reset'); start(); closeSheets(); }
-    });
-  }
-}
-
-function sheetUploadImg(input) {
-  if (!currentApp || !input.files || !input.files[0]) return;
-  api('/cardimage?pkg=' + encodeURIComponent(currentApp.pkg), {
-    method: 'POST',
-    body: input.files[0]
-  }).then(r => {
-    if (r.ok) { showToast('Image updated'); start(); closeSheets(); }
-    else showToast('Upload failed', true);
-  });
-}
-
-function renderApps() {
-  const container = document.getElementById('appsList');
-  container.innerHTML = '';
-  const filter = document.getElementById('q').value.toLowerCase();
-
-  const favPkgs = FAVS.map(f => f.pkg);
-  const hiddenPkgs = HIDDEN.map(h => h.pkg);
-
-  const matchingFavs = APPS.filter(a => favPkgs.includes(a.pkg) && !hiddenPkgs.includes(a.pkg) && a.label.toLowerCase().includes(filter));
-  if (matchingFavs.length > 0) {
-    const title = document.createElement('div');
-    title.className = 'section-title';
-    title.textContent = 'Favorites';
-    container.appendChild(title);
-
-    matchingFavs.forEach(a => container.appendChild(createAppItem(a, true)));
-  }
-
-  const titleAll = document.createElement('div');
-  titleAll.className = 'section-title';
-  titleAll.textContent = 'All Apps';
-  container.appendChild(titleAll);
-
-  const visibleApps = APPS.filter(a => !hiddenPkgs.includes(a.pkg) && a.label.toLowerCase().includes(filter));
-  visibleApps.forEach(a => container.appendChild(createAppItem(a, false)));
-
-  const matchingHidden = APPS.filter(a => hiddenPkgs.includes(a.pkg) && a.label.toLowerCase().includes(filter));
-  if (matchingHidden.length > 0) {
-    const titleHid = document.createElement('div');
-    titleHid.className = 'section-title';
-    titleHid.textContent = 'Hidden Apps';
-    container.appendChild(titleHid);
-
-    matchingHidden.forEach(a => container.appendChild(createAppItem(a, false, true)));
-  }
-}
-
-function createAppItem(a, isFav, isHid) {
-  const d = document.createElement('div');
-  d.className = 'app-item';
-  d.onclick = () => openAppSheet(a.pkg);
-
-  const info = document.createElement('div');
-  info.className = 'app-info';
-
-  const name = document.createElement('div');
-  name.className = 'app-name';
-  name.textContent = a.label;
-
-  const meta = document.createElement('div');
-  meta.className = 'app-meta';
-  meta.textContent = (isFav ? 'Favorite • ' : '') + (isHid ? 'Hidden • ' : '') + 'Launches: ' + (a.launches || 0);
-
-  info.appendChild(name);
-  info.appendChild(meta);
-  d.appendChild(info);
-
-  const icon = document.createElement('div');
-  icon.className = 'app-action-icon';
-  icon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>';
-  d.appendChild(icon);
-
-  return d;
-}
-
-function up(input) {
-  const f = input.files[0];
-  if (!f) return;
-
-  if (WALLPAPERS.length >= 8) {
-    showToast('Maximum 8 wallpapers allowed', true);
-    input.value = '';
-    return;
-  }
-
-  showToast("Uploading...");
-
-  const img = new Image();
-  const reader = new FileReader();
-
-  reader.onload = function(e) {
-    img.onload = function() {
-      let w = img.width;
-      let h = img.height;
-      const maxDim = 1920;
-      if (w > maxDim || h > maxDim) {
-        if (w >= h) {
-          h = Math.round((h * maxDim) / w);
-          w = maxDim;
-        } else {
-          w = Math.round((w * maxDim) / h);
-          h = maxDim;
-        }
-      }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
-
-      canvas.toBlob(function(blob) {
-        input.value = '';
-        if (!blob) {
-          showToast('Unsupported image format', true);
-          return;
-        }
-
-        api('/wallpaper', {
-          method: 'POST',
-          body: blob
-        }).then(r => {
-          if (r.ok) {
-            showToast('Wallpaper updated');
-            start();
-          } else if (r.status === 413) {
-            showToast('Image too large (max 8 MB)', true);
-          } else {
-            r.text().then(msg => showToast(msg || 'Unsupported image format', true))
-             .catch(() => showToast('Unsupported image format', true));
-          }
-        }).catch(() => {
-          showToast('Upload failed', true);
-        });
-      }, 'image/jpeg', 0.85);
-    };
-    img.onerror = function() {
-      input.value = '';
-      showToast('Unsupported image format', true);
-    };
-    img.src = e.target.result;
-  };
-  reader.onerror = function() {
-    input.value = '';
-    showToast('Failed to read image', true);
-  };
-  reader.readAsDataURL(f);
-}
-
-function loadSettings() {
-  api('/settings').then(r => r.json()).then(s => {
-    document.getElementById('userName').value = s.userName || '';
-    document.getElementById('is12h').value = s.is12h ? 'true' : 'false';
-    document.getElementById('showSeconds').checked = !!s.showSeconds;
-    document.getElementById('showDate').checked = !!s.showDate;
-    document.getElementById('sortMode').value = s.sortMode || 'alphabetical';
-    document.getElementById('homeQrMode').value = s.homeQrMode || 'always';
-    document.getElementById('groupByCategory').checked = s.groupByCategory !== false;
-    document.getElementById('slideshowInterval').value = s.slideshowInterval !== undefined ? s.slideshowInterval : 0;
-    document.getElementById('screensaverTimeout').value = s.screensaverTimeout !== undefined ? s.screensaverTimeout : 0;
-    document.getElementById('weatherCity').value = s.weatherCity || '';
-    document.getElementById('weatherUnit').value = s.weatherUnit || 'c';
-    document.getElementById('displayMode').value = s.displayMode || 'standard';
-    document.getElementById('displayAutoStart').value = s.displayAutoStart || '08:00';
-    document.getElementById('displayAutoEnd').value = s.displayAutoEnd || '18:00';
-    updateAccDots(s.accessibilityEnabled !== false);
-  }).catch(() => {});
-}
-
-function saveSettings() {
-  const data = {
-    userName: document.getElementById('userName').value.trim(),
-    is12h: document.getElementById('is12h').value === 'true',
-    showSeconds: document.getElementById('showSeconds').checked,
-    showDate: document.getElementById('showDate').checked,
-    sortMode: document.getElementById('sortMode').value,
-    homeQrMode: document.getElementById('homeQrMode').value,
-    groupByCategory: document.getElementById('groupByCategory').checked,
-    slideshowInterval: parseInt(document.getElementById('slideshowInterval').value) || 0,
-    screensaverTimeout: parseInt(document.getElementById('screensaverTimeout').value) || 0,
-    weatherCity: document.getElementById('weatherCity').value.trim(),
-    weatherUnit: document.getElementById('weatherUnit').value,
-    displayMode: document.getElementById('displayMode').value,
-    displayAutoStart: document.getElementById('displayAutoStart').value || '08:00',
-    displayAutoEnd: document.getElementById('displayAutoEnd').value || '18:00'
-  };
-  api('/settings', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  }).then(r => {
-    if (r.ok) { showToast('Settings saved'); start(); }
-    else showToast('Failed to save settings', true);
-  }).catch(() => showToast('Network error', true));
-}
-
-function resetUsageStats() {
-  api('/resetusage', { method: 'POST' }).then(r => {
-    if (r.ok) { showToast('Usage stats reset'); start(); }
-  });
-}
+document.getElementById('btnPower').addEventListener('click', () => api('/power', { method: 'POST' }));
 </script></body></html>

@@ -36,6 +36,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ProjectorSetupActivity"
+            android:exported="true"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|uiMode" />
+
         <service
             android:name=".RemoteService"
             android:exported="false" />
@@ -61,6 +66,15 @@
             <meta-data
                 android:name="android.accessibilityservice.accessibilityservice"
                 android:resource="@xml/home_key_service_config" />
+        </service>
+
+        <service
+            android:name=".MediaListenerService"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
         </service>
 
     </application>
