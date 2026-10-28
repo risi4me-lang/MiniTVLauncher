@@ -1,6 +1,7 @@
 package com.mini.tvlauncher
 
 import android.app.Activity
+import android.app.ActivityManager
 import android.app.AlertDialog
 import android.app.role.RoleManager
 import android.content.*
@@ -268,6 +269,7 @@ class MainActivity : Activity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        KeyEventBuffer.add(event)
         resetIdleTimer()
         if (screensaverPanel.visibility == View.VISIBLE) {
             dismissScreensaver()
@@ -379,6 +381,25 @@ class MainActivity : Activity() {
         toolsRow.requestFocus()
     }
 
+    private fun openDeviceReportDialog() {
+        val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        val memInfo = ActivityManager.MemoryInfo()
+        am?.getMemoryInfo(memInfo)
+        val ramMb = (memInfo?.totalMem ?: 0L) / (1024 * 1024)
+
+        val summary = "Device Model: ${Build.MANUFACTURER} ${Build.MODEL}\n" +
+                "Android Version: ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})\n" +
+                "Total RAM: ${ramMb} MB\n" +
+                "Total Apps Installed: ${allInstalledApps.size}\n\n" +
+                "👉 Open phone remote → Developer → Device report to copy or download full text report."
+
+        AlertDialog.Builder(this)
+            .setTitle("Device Report Summary")
+            .setMessage(summary)
+            .setPositiveButton("OK", null)
+            .show()
+    }
+
     private fun openDefaultHomeChooser() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -433,6 +454,7 @@ class MainActivity : Activity() {
                 "default_home" -> openDefaultHomeChooser()
                 "key_tester" -> openKeyTesterPanel()
                 "projector_setup" -> startActivity(Intent(this, ProjectorSetupActivity::class.java))
+                "device_report" -> openDeviceReportDialog()
                 "media_access" -> {
                     try {
                         startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -769,6 +791,7 @@ class MainActivity : Activity() {
 
         result.add(ToolTile("power", "Power", R.drawable.ic_tool_power, Intent()))
         result.add(ToolTile("projector_setup", "Projector Setup", R.drawable.ic_tool_display, Intent(this, ProjectorSetupActivity::class.java)))
+        result.add(ToolTile("device_report", "Device Report", R.drawable.ic_tool_settings, Intent()))
         result.add(ToolTile("media_access", "Enable Media Access", R.drawable.ic_tool_settings, Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)))
         result.add(ToolTile("default_home", "Default Home", R.drawable.ic_tool_launcher, Intent()))
         result.add(ToolTile("key_tester", "Key Tester", R.drawable.ic_tool_settings, Intent()))

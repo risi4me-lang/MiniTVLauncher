@@ -7,17 +7,41 @@ import android.view.accessibility.AccessibilityEvent
 
 class HomeKeyService : AccessibilityService() {
 
-    private val homeKeyCodes = setOf(
-        KeyEvent.KEYCODE_ALL_APPS, // 284
-        KeyEvent.KEYCODE_HOME      // 3
-    )
+    companion object {
+        @Volatile var instance: HomeKeyService? = null
+            private set
+    }
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        instance = this
+    }
+
+    override fun onUnbind(intent: Intent?): Boolean {
+        instance = null
+        return super.onUnbind(intent)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        instance = null
+    }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
 
     override fun onInterrupt() {}
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_UP && homeKeyCodes.contains(event.keyCode)) {
+        KeyEventBuffer.add(event, "HomeKeyService")
+
+        val prefs = getSharedPreferences("launcher", MODE_PRIVATE)
+        val customKey = prefs.getInt("custom_home_keycode", -1)
+
+        val isHomeKey = event.keyCode == KeyEvent.KEYCODE_ALL_APPS ||
+                event.keyCode == KeyEvent.KEYCODE_HOME ||
+                (customKey != -1 && event.keyCode == customKey)
+
+        if (event.action == KeyEvent.ACTION_UP && isHomeKey) {
             launchHome()
             return true
         }

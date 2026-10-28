@@ -44,6 +44,15 @@ interface RemoteHost {
     fun cancelSleepTimer(): Boolean
     fun toggleSetupPattern(): Boolean
     fun toggleControlCenter(): String?
+    fun getDeviceReport(includeUserApps: Boolean): String
+    fun getKeyLogJson(): String
+    fun clearKeyLog(): Boolean
+    fun getServiceStatusJson(): String
+    fun openSettingsTarget(target: String): Boolean
+    fun getErrorsText(): String
+    fun exportSettingsJson(): String
+    fun importSettingsJson(jsonStr: String): Boolean
+    fun setCustomHomeKey(code: Int): Boolean
 }
 
 class RemoteServer(private val pin: String, private val host: RemoteHost) {
@@ -233,6 +242,52 @@ class RemoteServer(private val pin: String, private val host: RemoteHost) {
                         } else {
                             reply(out, 400, "text/plain", err.toByteArray(Charsets.UTF_8))
                         }
+                    }
+                    "/report" -> {
+                        val incApps = q["apps"] == "1" || q["apps"] == "true"
+                        val reportText = host.getDeviceReport(incApps)
+                        reply(out, 200, "text/plain; charset=utf-8", reportText.toByteArray(Charsets.UTF_8))
+                    }
+                    "/keylog" -> {
+                        if (method == "GET") {
+                            reply(out, 200, "application/json", host.getKeyLogJson().toByteArray(Charsets.UTF_8))
+                        } else if (method == "POST" && path == "/keylog/clear") {
+                            reply(out, if (host.clearKeyLog()) 200 else 400, "text/plain", "ok".toByteArray())
+                        } else {
+                            reply(out, 405, "text/plain", ByteArray(0))
+                        }
+                    }
+                    "/keylog/clear" -> {
+                        reply(out, if (host.clearKeyLog()) 200 else 400, "text/plain", "ok".toByteArray())
+                    }
+                    "/status" -> {
+                        reply(out, 200, "application/json", host.getServiceStatusJson().toByteArray(Charsets.UTF_8))
+                    }
+                    "/opensettings" -> {
+                        val target = q["target"] ?: q["t"] ?: "accessibility"
+                        val ok = host.openSettingsTarget(target)
+                        reply(out, if (ok) 200 else 400, "text/plain", "ok".toByteArray())
+                    }
+                    "/errors" -> {
+                        reply(out, 200, "text/plain; charset=utf-8", host.getErrorsText().toByteArray(Charsets.UTF_8))
+                    }
+                    "/exportsettings" -> {
+                        reply(out, 200, "application/json", host.exportSettingsJson().toByteArray(Charsets.UTF_8))
+                    }
+                    "/importsettings" -> {
+                        val bodyBuf = if (len in 1..100_000) {
+                            val b = ByteArray(len)
+                            var n = 0
+                            while (n < len) { val r = inp.read(b, n, len - n); if (r < 0) break; n += r }
+                            b
+                        } else ByteArray(0)
+                        val ok = host.importSettingsJson(String(bodyBuf, Charsets.UTF_8))
+                        reply(out, if (ok) 200 else 400, "application/json", "{\"status\":\"ok\"}".toByteArray())
+                    }
+                    "/customhomekey" -> {
+                        val code = q["code"]?.toIntOrNull() ?: 0
+                        val ok = host.setCustomHomeKey(code)
+                        reply(out, if (ok) 200 else 400, "text/plain", "ok".toByteArray())
                     }
                     "/icon" -> {
                         val pkg = q["pkg"] ?: ""

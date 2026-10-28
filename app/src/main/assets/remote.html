@@ -59,12 +59,6 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
 
 .sheet-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; pointer-events: none; transition: opacity 0.25s ease; z-index: 500; }
 .sheet-backdrop.open { opacity: 1; pointer-events: auto; }
-.sheet { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(13, 19, 34, 0.92); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-top: 1px solid var(--glass-border-light); border-top-left-radius: 28px; border-top-right-radius: 28px; padding: 20px; max-width: 500px; margin: 0 auto; transform: translateY(100%); transition: transform 0.28s cubic-bezier(0.1, 0.9, 0.2, 1); z-index: 501; max-height: 85vh; overflow-y: auto; }
-.sheet.open { transform: translateY(0); }
-.sheet-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; border-bottom: 1px solid var(--glass-border); padding-bottom: 12px; }
-.sheet-title { font-size: 17px; font-weight: 600; color: #fff; }
-.sheet-close { background: var(--glass-bg); border: 1px solid var(--glass-border); color: #a0b0d0; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-.sheet-close svg { width: 16px; height: 16px; fill: currentColor; }
 
 .section-title { font-size: 12px; font-weight: 600; color: #8090b0; text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 8px; }
 .card { background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: 18px; padding: 14px; margin-bottom: 12px; }
@@ -82,11 +76,27 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
 .app-name { font-size: 15px; font-weight: 500; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app-meta { font-size: 12px; color: #7080a0; margin-top: 2px; }
 
+.check-row { display: flex; align-items: center; justify-content: space-between; min-height: 48px; border-bottom: 1px solid var(--glass-border); }
+.check-row:last-child { border-bottom: none; }
+.check-row input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--accent); }
+
 #loginView { max-width: 360px; margin: 60px auto; text-align: center; padding: 24px; background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--glass-border); border-radius: 24px; }
 </style>
 </head><body>
 
 <div id="toast" class="toast"></div>
+
+<!-- Modal Confirm Overlay -->
+<div id="confirmOverlay" class="sheet-backdrop">
+  <div style="max-width:340px;margin:120px auto;background:#131b2e;padding:20px;border-radius:20px;border:1px solid var(--glass-border);text-align:center">
+    <div id="confirmTitle" style="font-weight:600;font-size:16px;margin-bottom:8px">Confirm</div>
+    <div id="confirmMessage" style="font-size:14px;color:#a0b0d0;margin-bottom:16px">Are you sure?</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="closeConfirm(false)" class="btn btn-secondary" style="flex:1;margin:0">Cancel</button>
+      <button id="confirmOkBtn" onclick="closeConfirm(true)" class="btn btn-danger" style="flex:1;margin:0">OK</button>
+    </div>
+  </div>
+</div>
 
 <div id="loginView">
   <h3 style="margin-bottom:12px;color:#fff">Pair Remote</h3>
@@ -99,8 +109,6 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
 
   <!-- Remote Tab -->
   <div id="view-remote" class="view">
-
-    <!-- Now Playing Glass Card -->
     <div id="nowPlayingCard" class="card" style="display:none">
       <div style="display:flex;align-items:center;gap:12px">
         <img id="npAppIcon" style="width:40px;height:40px;border-radius:10px;object-fit:cover;background:rgba(255,255,255,0.1)">
@@ -119,7 +127,6 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
       </div>
     </div>
 
-    <!-- Sleep Timer Countdown Banner -->
     <div id="sleepCard" class="card" style="display:none;background:rgba(255,100,100,0.15)">
       <div style="display:flex;align-items:center;justify-content:space-between">
         <span id="sleepTimerText" style="font-size:14px;font-weight:600">Sleep Timer: --</span>
@@ -160,7 +167,6 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
       <button onclick="toggleSetup()" class="btn-open-tools">Setup Pattern</button>
     </div>
 
-    <!-- Quick Apps Grid Section -->
     <div class="quick-apps-header">
       <span class="section-title" style="margin:0">Quick Apps</span>
       <button class="btn-text" onclick="openEditQuickApps()">Edit</button>
@@ -191,11 +197,78 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
     </div>
 
     <div class="card">
-      <div style="margin-bottom:12px">
+      <div class="check-row">
+        <span>Developer Mode</span>
+        <input type="checkbox" id="devModeToggle" onchange="toggleDevMode(this.checked)">
+      </div>
+      <div style="margin-top:12px">
         <label class="section-title">Your Name</label>
         <input type="text" id="userName" class="input-field" placeholder="Enter name">
       </div>
       <button onclick="saveSettings()" class="btn">Save Settings</button>
+      <div id="versionLine" onclick="onVersionClick()" style="text-align:center;font-size:12px;color:#7080a0;margin-top:16px;cursor:pointer">Mini Launcher v0.3 (3)</div>
+    </div>
+  </div>
+
+  <!-- Developer Tab -->
+  <div id="view-developer" class="view">
+    <!-- Device Report -->
+    <div class="card">
+      <label class="section-title">Device Report</label>
+      <div class="check-row">
+        <span>Include User Apps</span>
+        <input type="checkbox" id="reportIncApps">
+      </div>
+      <button onclick="genReport()" class="btn">Generate Report</button>
+      <textarea id="reportBox" readonly class="input-field" style="height:160px;margin-top:10px;font-family:monospace;font-size:11px;white-space:pre" placeholder="Click Generate Report..."></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button onclick="copyReport()" class="btn btn-secondary" style="flex:1;margin:0">Copy</button>
+        <button onclick="downloadReport()" class="btn btn-secondary" style="flex:1;margin:0">Download .txt</button>
+      </div>
+    </div>
+
+    <!-- Key Tester -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <label class="section-title" style="margin:0">Key Tester (Last 30)</label>
+        <button onclick="clearKeyLog()" class="btn-text" style="color:#ff6b6b">Clear</button>
+      </div>
+      <div id="keyLogList" style="max-height:220px;overflow-y:auto;font-family:monospace;font-size:11px"></div>
+    </div>
+
+    <!-- Service Status -->
+    <div class="card">
+      <label class="section-title">Service Status</label>
+      <div id="serviceStatusList"></div>
+    </div>
+
+    <!-- Recent Errors -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <label class="section-title" style="margin:0">Recent Errors & Exit Reasons</label>
+        <button onclick="copyErrors()" class="btn-text">Copy</button>
+      </div>
+      <textarea id="errorsBox" readonly class="input-field" style="height:120px;font-family:monospace;font-size:11px;white-space:pre"></textarea>
+    </div>
+
+    <!-- Maintenance Buttons -->
+    <div class="card">
+      <label class="section-title">Maintenance & Debug</label>
+      <button onclick="exportSettings()" class="btn btn-secondary">Export Settings (JSON)</button>
+      <label class="btn btn-secondary">
+        Import Settings (JSON)
+        <input type="file" accept=".json" onchange="importSettings(this)" style="display:none">
+      </label>
+      <button onclick="confirmResetStats()" class="btn btn-secondary">Reset Usage Stats</button>
+      <button onclick="confirmForgetAll()" class="btn btn-danger">Forget All Paired Phones</button>
+      <button onclick="confirmRestartService()" class="btn btn-danger">Restart Remote Service</button>
+    </div>
+
+    <!-- About Box -->
+    <div class="card" style="text-align:center">
+      <label class="section-title">About</label>
+      <div style="font-size:13px;color:#a0b0d0">MiniTVLauncher v0.3 (code 3)</div>
+      <div style="font-size:12px;color:#7080a0;margin-top:4px">Build: Debug • Phone Remote v0.3</div>
     </div>
   </div>
 
@@ -203,21 +276,19 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
 
 <!-- Glass Tab Bar -->
 <div class="tab-bar">
-  <button class="tab-item active" data-tab="remote" onclick="setTab('remote')">
-    Remote
-  </button>
-  <button class="tab-item" data-tab="apps" onclick="setTab('apps')">
-    Apps
-  </button>
-  <button class="tab-item" data-tab="settings" onclick="setTab('settings')">
-    Settings
-  </button>
+  <button class="tab-item active" data-tab="remote" onclick="setTab('remote')">Remote</button>
+  <button class="tab-item" data-tab="apps" onclick="setTab('apps')">Apps</button>
+  <button class="tab-item" data-tab="settings" onclick="setTab('settings')">Settings</button>
+  <button id="devTabBtn" class="tab-item" data-tab="developer" onclick="setTab('developer')" style="display:none">Developer</button>
 </div>
 
 <script>
 let KEY = localStorage.getItem('device_key') || '';
 let PIN = sessionStorage.getItem('pin') || '';
-let APPS = [], FAVS = [], HIDDEN = [], WALLPAPERS = [];
+let APPS = [], FAVS = [], HIDDEN = [];
+let keyLogTimer = null;
+let versionClicks = 0;
+let pendingConfirmCb = null;
 
 if (window.PAIRED_KEY) {
   KEY = window.PAIRED_KEY;
@@ -239,6 +310,20 @@ function showToast(msg, isError = false) {
   t.timer = setTimeout(() => { t.className = 'toast'; }, 2600);
 }
 
+function showModalConfirm(msg, cb) {
+  pendingConfirmCb = cb;
+  document.getElementById('confirmMessage').textContent = msg;
+  document.getElementById('confirmOverlay').classList.add('open');
+}
+
+function closeConfirm(ok) {
+  document.getElementById('confirmOverlay').classList.remove('open');
+  if (pendingConfirmCb) {
+    if (ok) pendingConfirmCb();
+    pendingConfirmCb = null;
+  }
+}
+
 function setTab(tabName) {
   document.querySelectorAll('.tab-item').forEach(b => {
     b.classList.toggle('active', b.dataset.tab === tabName);
@@ -246,6 +331,37 @@ function setTab(tabName) {
   document.querySelectorAll('.view').forEach(v => {
     v.classList.toggle('active', v.id === 'view-' + tabName);
   });
+
+  if (tabName === 'developer') {
+    loadDevTabData();
+    if (!keyLogTimer) keyLogTimer = setInterval(loadKeyLog, 2000);
+  } else {
+    if (keyLogTimer) { clearInterval(keyLogTimer); keyLogTimer = null; }
+  }
+}
+
+function toggleDevMode(on) {
+  localStorage.setItem('dev_mode', on ? '1' : '0');
+  document.getElementById('devTabBtn').style.display = on ? 'flex' : 'none';
+  if (on) showToast('Developer mode on');
+  else if (document.querySelector('.tab-item.active').dataset.tab === 'developer') {
+    setTab('remote');
+  }
+}
+
+function onVersionClick() {
+  versionClicks++;
+  if (versionClicks >= 7) {
+    versionClicks = 0;
+    document.getElementById('devModeToggle').checked = true;
+    toggleDevMode(true);
+  }
+}
+
+const isDev = localStorage.getItem('dev_mode') === '1';
+if (isDev) {
+  document.getElementById('devModeToggle').checked = true;
+  document.getElementById('devTabBtn').style.display = 'flex';
 }
 
 function api(p, o) {
@@ -261,6 +377,166 @@ function start() {
     document.getElementById('mainView').style.display = 'block';
     pollNowPlaying();
     pollSleepStatus();
+  });
+}
+
+function loadDevTabData() {
+  loadKeyLog();
+  loadServiceStatus();
+  loadErrors();
+}
+
+function genReport() {
+  const inc = document.getElementById('reportIncApps').checked ? '1' : '0';
+  showToast('Generating report...');
+  api('/report?apps=' + inc).then(r => r.text()).then(txt => {
+    document.getElementById('reportBox').value = txt;
+    showToast('Report generated');
+  }).catch(() => showToast('Failed to generate report', true));
+}
+
+function copyReport() {
+  const box = document.getElementById('reportBox');
+  box.select();
+  try {
+    document.execCommand('copy');
+    showToast('Copied to clipboard');
+  } catch (_) { showToast('Copy failed', true); }
+}
+
+function downloadReport() {
+  const txt = document.getElementById('reportBox').value;
+  if (!txt) return;
+  const blob = new Blob([txt], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'device-report.txt';
+  a.click();
+}
+
+function loadKeyLog() {
+  api('/keylog').then(r => r.json()).then(logs => {
+    const list = document.getElementById('keyLogList');
+    list.innerHTML = '';
+    logs.forEach(e => {
+      const row = document.createElement('div');
+      row.style.padding = '4px 0';
+      row.style.borderBottom = '1px solid rgba(255,255,255,0.08)';
+      row.style.display = 'flex';
+      row.style.justifyContent = 'space-between';
+      row.style.alignItems = 'center';
+
+      const txt = document.createElement('span');
+      txt.textContent = `[${e.time}] Code ${e.keyCode} (${e.keyName})`;
+
+      const btn = document.createElement('button');
+      btn.className = 'btn-text';
+      btn.textContent = 'Set Home';
+      btn.onclick = () => {
+        api('/customhomekey?code=' + e.keyCode, { method: 'POST' }).then(() => showToast('Saved as Home key'));
+      };
+
+      row.appendChild(txt);
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+  }).catch(() => {});
+}
+
+function clearKeyLog() {
+  api('/keylog/clear', { method: 'POST' }).then(() => {
+    document.getElementById('keyLogList').innerHTML = '';
+    showToast('Key log cleared');
+  });
+}
+
+function loadServiceStatus() {
+  api('/status').then(r => r.json()).then(st => {
+    const list = document.getElementById('serviceStatusList');
+    list.innerHTML = '';
+
+    const items = [
+      { name: 'Remote Service', on: st.remoteService, target: '' },
+      { name: 'Accessibility Service', on: st.accessibilityService, target: 'accessibility' },
+      { name: 'Home Key Service', on: st.homeKeyService, target: 'accessibility' },
+      { name: 'Notification Listener', on: st.mediaListenerService, target: 'notifications' }
+    ];
+
+    items.forEach(it => {
+      const row = document.createElement('div');
+      row.className = 'app-item';
+      row.style.minHeight = '44px';
+
+      const name = document.createElement('span');
+      name.textContent = it.name + ': ' + (it.on ? 'RUNNING' : 'OFF');
+      name.style.color = it.on ? '#4ade80' : '#f87171';
+
+      row.appendChild(name);
+
+      if (!it.on && it.target) {
+        const btn = document.createElement('button');
+        btn.className = 'btn-text';
+        btn.textContent = 'Open on TV';
+        btn.onclick = () => api('/opensettings?target=' + it.target, { method: 'POST' });
+        row.appendChild(btn);
+      }
+
+      list.appendChild(row);
+    });
+  });
+}
+
+function loadErrors() {
+  api('/errors').then(r => r.text()).then(txt => {
+    document.getElementById('errorsBox').value = txt;
+  });
+}
+
+function copyErrors() {
+  const box = document.getElementById('errorsBox');
+  box.select();
+  document.execCommand('copy');
+  showToast('Copied errors');
+}
+
+function exportSettings() {
+  api('/exportsettings').then(r => r.text()).then(txt => {
+    const blob = new Blob([txt], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'mini-launcher-settings.json';
+    a.click();
+  });
+}
+
+function importSettings(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    api('/importsettings', { method: 'POST', body: e.target.result }).then(r => {
+      if (r.ok) showToast('Settings imported');
+      else showToast('Import failed', true);
+    });
+  };
+  reader.readAsText(file);
+}
+
+function confirmResetStats() {
+  showModalConfirm('Reset all app launch usage counts?', () => {
+    api('/resetusage', { method: 'POST' }).then(() => showToast('Stats reset'));
+  });
+}
+
+function confirmForgetAll() {
+  showModalConfirm('Forget all paired phones?', () => {
+    api('/settings', { method: 'POST', body: JSON.stringify({ paired_devices_json: '[]' }) }).then(() => showToast('Paired phones removed'));
+  });
+}
+
+function confirmRestartService() {
+  showModalConfirm('Restart remote web service?', () => {
+    api('/power', { method: 'POST' });
   });
 }
 
@@ -297,36 +573,12 @@ function pollSleepStatus() {
   }).catch(() => {}).finally(() => setTimeout(pollSleepStatus, 3000));
 }
 
-function mediaAct(act) {
-  api('/media?a=' + act, { method: 'POST' });
-}
-
-function seekMedia(val) {
-  api('/media?a=seek_to&pos=' + val, { method: 'POST' });
-}
-
-function addSleep(m) {
-  api('/sleep?min=' + m, { method: 'POST' });
-}
-
-function cancelSleep() {
-  api('/sleep/cancel', { method: 'POST' });
-}
-
-function setSleep(val) {
-  if (val === '0') cancelSleep();
-  else api('/sleep?min=' + val, { method: 'POST' });
-}
-
-function toggleCC() {
-  api('/controlcenter', { method: 'POST' }).then(r => {
-    if (!r.ok) r.text().then(msg => showToast(msg, true));
-  });
-}
-
-function toggleSetup() {
-  api('/setup', { method: 'POST' });
-}
+function mediaAct(act) { api('/media?a=' + act, { method: 'POST' }); }
+function seekMedia(val) { api('/media?a=seek_to&pos=' + val, { method: 'POST' }); }
+function addSleep(m) { api('/sleep?min=' + m, { method: 'POST' }); }
+function cancelSleep() { api('/sleep/cancel', { method: 'POST' }); }
+function toggleCC() { api('/controlcenter', { method: 'POST' }).then(r => { if (!r.ok) r.text().then(msg => showToast(msg, true)); }); }
+function toggleSetup() { api('/setup', { method: 'POST' }); }
 
 document.getElementById('btnVolUp').addEventListener('click', () => api('/volume?action=up', { method: 'POST' }));
 document.getElementById('btnVolDown').addEventListener('click', () => api('/volume?action=down', { method: 'POST' }));

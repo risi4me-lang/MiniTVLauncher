@@ -3,6 +3,7 @@ package com.mini.tvlauncher
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.AudioManager
@@ -10,6 +11,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
+import android.provider.Settings
 import android.view.KeyEvent
 import org.json.JSONArray
 import org.json.JSONObject
@@ -126,6 +128,116 @@ class RemoteService : Service(), RemoteHost {
     }
 
     // ---- RemoteHost Implementation ----
+    override fun getDeviceReport(includeUserApps: Boolean): String {
+        return DeviceReportCollector.generateReport(this, includeUserApps)
+    }
+
+    override fun getKeyLogJson(): String {
+        return KeyEventBuffer.getJson()
+    }
+
+    override fun clearKeyLog(): Boolean {
+        KeyEventBuffer.clear()
+        return true
+    }
+
+    override fun getServiceStatusJson(): String {
+        val obj = JSONObject().apply {
+            put("remoteService", serverPort != 0)
+            put("accessibilityService", RemoteAccessibilityService.instance != null)
+            put("homeKeyService", HomeKeyService.instance != null)
+            put("mediaListenerService", NowPlayingManager.isNotificationListenerEnabled(this@RemoteService))
+            put("postNotificationsPermission", if (Build.VERSION.SDK_INT >= 33) checkCallingOrSelfPermission("android.permission.POST_NOTIFICATIONS") == PackageManager.PERMISSION_GRANTED else true)
+        }
+        return obj.toString()
+    }
+
+    override fun openSettingsTarget(target: String): Boolean {
+        return try {
+            val intent = when (target.lowercase(Locale.US)) {
+                "accessibility" -> Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                "notifications" -> Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                "home" -> Intent(Settings.ACTION_HOME_SETTINGS)
+                else -> Intent(Settings.ACTION_SETTINGS)
+            }.apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+            true
+        } catch (_: Exception) { false }
+    }
+
+    override fun getErrorsText(): String {
+        val sb = StringBuilder()
+        if (Build.VERSION.SDK_INT >= 30) {
+            try {
+                val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                val exitInfos = am?.getHistoricalProcessExitReasons(packageName, 0, 10)
+                if (exitInfos != null && exitInfos.isNotEmpty()) {
+                    sb.append("=== ApplicationExitInfo (last 10) ===\n")
+                    exitInfos.forEach { ei ->
+                        sb.append("- Reason=").append(ei.reason).append(": ").append(ei.description ?: "no description").append("\n")
+                    }
+                    sb.append("\n")
+                }
+            } catch (_: Exception) {}
+        }
+
+        sb.append("=== Recent Fatal / Runtime Errors ===\n")
+        try {
+            val process = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-t", "300"))
+            process.inputStream.bufferedReader().useLines { lines ->
+                lines.filter { it.contains("AndroidRuntime", true) || it.contains("FATAL", true) }
+                    .take(20)
+                    .forEach { sb.append(it).append("\n") }
+            }
+        } catch (_: Exception) {
+            sb.append("Logcat unavailable\n")
+        }
+
+        return sb.toString()
+    }
+
+    override fun exportSettingsJson(): String {
+        val json = JSONObject()
+        val allEntries = prefs.all
+        allEntries.forEach { (k, v) ->
+            if (k != "user_name" && k != "weather_city" && k != "pin") {
+                json.put(k, v)
+            }
+        }
+        return json.toString()
+    }
+
+    override fun importSettingsJson(jsonStr: String): Boolean {
+        return try {
+            val obj = JSONObject(jsonStr)
+            val editor = prefs.edit()
+            val keys = obj.keys()
+            while (keys.hasNext()) {
+                val k = keys.next()
+                if (k != "user_name" && k != "weather_city" && k != "pin") {
+                    when (val v = obj.get(k)) {
+                        is Boolean -> editor.putBoolean(k, v)
+                        is Int -> editor.putInt(k, v)
+                        is Long -> editor.putLong(k, v)
+                        is Float -> editor.putFloat(k, v.toFloat())
+                        is String -> editor.putString(k, v)
+                    }
+                }
+            }
+            editor.apply()
+            val main = MainActivity.activeInstance?.get()
+            main?.runOnUiThread { main.applyWallpaper(); main.reloadAppsAndRefresh() }
+            true
+        } catch (_: Exception) { false }
+    }
+
+    override fun setCustomHomeKey(code: Int): Boolean {
+        prefs.edit().putInt("custom_home_keycode", code).apply()
+        return true
+    }
+
     override fun getNowPlayingJson(): String {
         return nowPlayingManager?.getNowPlayingJson() ?: "{}"
     }
