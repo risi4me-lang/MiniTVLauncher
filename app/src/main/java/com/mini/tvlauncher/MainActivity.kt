@@ -57,6 +57,7 @@ class MainActivity : Activity() {
     private lateinit var qrPairingManager: QrPairingManager
     private lateinit var wallpaperManager: WallpaperManager
     private lateinit var categoryRowsManager: CategoryRowsManager
+    private lateinit var topShelfManager: TopShelfManager
 
     private lateinit var keyTesterPanel: FrameLayout
     private lateinit var keyTesterCodeText: TextView
@@ -85,8 +86,14 @@ class MainActivity : Activity() {
     }
 
     private val prefChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == "user_name" || key == "clock_is_12h" || key == "clock_show_seconds" || key == "clock_show_date" || key == "favorite_pkgs_json" || key == "hidden_pkgs_json" || key == "app_rename_map" || key == "app_category_map" || key == "group_by_category" || key == "app_launch_counts" || key == "app_sort_mode") {
-            runOnUiThread { try { settingsApplier.applySettings(); reloadAppsAndRefresh() } catch (_: Exception) {} }
+        if (key == "user_name" || key == "clock_is_12h" || key == "clock_show_seconds" || key == "clock_show_date" || key == "favorite_pkgs_json" || key == "hidden_pkgs_json" || key == "app_rename_map" || key == "app_category_map" || key == "group_by_category" || key == "app_launch_counts" || key == "app_sort_mode" || key == "display_mode" || key == "display_auto_start" || key == "display_auto_end") {
+            runOnUiThread {
+                try {
+                    settingsApplier.applySettings()
+                    DisplayModeManager.applyDisplayMode(this, prefs)
+                    reloadAppsAndRefresh()
+                } catch (_: Exception) {}
+            }
         } else if (key == "preset" || key == "custom" || key == "wallpaper_version" || key == "wallpaper_slideshow_interval") {
             runOnUiThread { try { wallpaperManager.applyWallpaper() } catch (_: Exception) {} }
         } else if (key == "home_qr_mode" || key == "paired_devices_json") {
@@ -154,6 +161,15 @@ class MainActivity : Activity() {
             try { settingsApplier.fetchWeatherBackground() } catch (_: Exception) {}
         }
 
+        topShelfManager = TopShelfManager(
+            this, prefs,
+            findViewById(R.id.topShelfContainer),
+            findViewById(R.id.topShelfBanner),
+            findViewById(R.id.topShelfBannerNext),
+            findViewById(R.id.topShelfTitle),
+            findViewById(R.id.topShelfSubtitle)
+        )
+
         searchPanelManager = SearchPanelManager(
             this,
             findViewById(R.id.searchPillBtn),
@@ -187,7 +203,8 @@ class MainActivity : Activity() {
         categoryRowsManager = CategoryRowsManager(
             prefs, rowsContainer, sharedViewPool,
             onAppClick = { launch(it) },
-            onAppLongClick = { entry, view -> showAppContextMenu(entry, view) }
+            onAppLongClick = { entry, view -> showAppContextMenu(entry, view) },
+            onAppFocused = { app -> topShelfManager.updateFocusedApp(app) }
         )
 
         keyTesterPanel = findViewById(R.id.keyTesterPanel)
@@ -206,6 +223,17 @@ class MainActivity : Activity() {
         val wallpaperBtn = findViewById<View>(R.id.wallpaperBtn)
         wallpaperBtn.setOnClickListener { wallpaperManager.chooseWallpaper() }
         wallpaperBtn.setOnFocusChangeListener { v, focused ->
+            if (focused) topShelfManager.updateFocusedApp(null)
+            v.animate().scaleX(if (focused) 1.08f else 1.0f).scaleY(if (focused) 1.08f else 1.0f).setDuration(160).start()
+        }
+
+        findViewById<View>(R.id.searchPillBtn).setOnFocusChangeListener { v, focused ->
+            if (focused) topShelfManager.updateFocusedApp(null)
+            v.animate().scaleX(if (focused) 1.08f else 1.0f).scaleY(if (focused) 1.08f else 1.0f).setDuration(160).start()
+        }
+
+        findViewById<View>(R.id.homeQrCard).setOnFocusChangeListener { v, focused ->
+            if (focused) topShelfManager.updateFocusedApp(null)
             v.animate().scaleX(if (focused) 1.08f else 1.0f).scaleY(if (focused) 1.08f else 1.0f).setDuration(160).start()
         }
 
@@ -224,6 +252,7 @@ class MainActivity : Activity() {
         }
 
         try { settingsApplier.applySettings() } catch (_: Exception) {}
+        try { DisplayModeManager.applyDisplayMode(this, prefs) } catch (_: Exception) {}
         try { wallpaperManager.applyWallpaper() } catch (_: Exception) {}
         try { loadApps() } catch (_: Exception) {}
         try { startRemoteService() } catch (_: Exception) {}
@@ -399,7 +428,7 @@ class MainActivity : Activity() {
 
     private fun refreshToolsRow() {
         val toolTiles = getAvailableToolTiles()
-        toolsRow.adapter = ToolsAdapter(toolTiles) { tile ->
+        toolsRow.adapter = ToolsAdapter(toolTiles, onClick = { tile ->
             when (tile.id) {
                 "hidden_apps" -> openHiddenAppsPanel()
                 "power" -> handlePowerClick()
@@ -415,7 +444,9 @@ class MainActivity : Activity() {
                     }
                 }
             }
-        }
+        }, onToolFocused = {
+            topShelfManager.updateFocusedApp(null)
+        })
     }
 
     fun reloadAppsAndRefresh() {
@@ -864,6 +895,7 @@ class MainActivity : Activity() {
         super.onStart()
         activeInstance = WeakReference(this)
         try { settingsApplier.applySettings() } catch (_: Exception) {}
+        try { DisplayModeManager.applyDisplayMode(this, prefs) } catch (_: Exception) {}
         try { networkIndicator.start() } catch (_: Exception) {}
         try { qrPairingManager.start() } catch (_: Exception) {}
         try { wallpaperManager.start() } catch (_: Exception) {}

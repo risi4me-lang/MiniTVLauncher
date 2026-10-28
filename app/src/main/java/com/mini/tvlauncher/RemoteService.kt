@@ -160,7 +160,6 @@ class RemoteService : Service(), RemoteHost {
             }
         }
 
-        // Route D-pad keys (up, down, left, right, ok) to MainActivity via WeakReference if in foreground
         if (mainActivity != null) {
             val code = when (keyName) {
                 "up" -> KeyEvent.KEYCODE_DPAD_UP
@@ -179,7 +178,6 @@ class RemoteService : Service(), RemoteHost {
             return null
         }
 
-        // Outside launcher: require Accessibility Service
         if (acc == null) {
             return "accessibility_off"
         }
@@ -422,6 +420,11 @@ class RemoteService : Service(), RemoteHost {
             put("groupByCategory", prefs.getBoolean("group_by_category", true))
             put("slideshowInterval", prefs.getInt("wallpaper_slideshow_interval", 0))
             put("screensaverTimeout", prefs.getInt("screensaver_timeout_minutes", 0))
+            put("weatherCity", prefs.getString("weather_city", "") ?: "")
+            put("weatherUnit", prefs.getString("weather_unit", "c") ?: "c")
+            put("displayMode", prefs.getString("display_mode", "standard") ?: "standard")
+            put("displayAutoStart", prefs.getString("display_auto_start", "08:00") ?: "08:00")
+            put("displayAutoEnd", prefs.getString("display_auto_end", "18:00") ?: "18:00")
             put("accessibilityEnabled", RemoteAccessibilityService.isEnabled(this@RemoteService))
         }
         return json.toString()
@@ -440,6 +443,11 @@ class RemoteService : Service(), RemoteHost {
             if (json.has("groupByCategory")) editor.putBoolean("group_by_category", json.getBoolean("groupByCategory"))
             if (json.has("slideshowInterval")) editor.putInt("wallpaper_slideshow_interval", json.getInt("slideshowInterval"))
             if (json.has("screensaverTimeout")) editor.putInt("screensaver_timeout_minutes", json.getInt("screensaverTimeout"))
+            if (json.has("weatherCity")) editor.putString("weather_city", json.getString("weatherCity").trim())
+            if (json.has("weatherUnit")) editor.putString("weather_unit", json.getString("weatherUnit"))
+            if (json.has("displayMode")) editor.putString("display_mode", json.getString("displayMode"))
+            if (json.has("displayAutoStart")) editor.putString("display_auto_start", json.getString("displayAutoStart"))
+            if (json.has("displayAutoEnd")) editor.putString("display_auto_end", json.getString("displayAutoEnd"))
             editor.apply()
             val main = MainActivity.activeInstance?.get()
             main?.resetIdleTimer()

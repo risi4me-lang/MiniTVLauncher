@@ -13,6 +13,7 @@ data class AppEntry(
     val icon: Drawable?,
     val averageColor: Int,
     val launchCount: Int = 0,
+    val lastLaunchedMs: Long = 0L,
     val hasCustomImage: Boolean = false,
     val appInfo: ApplicationInfo? = null
 )

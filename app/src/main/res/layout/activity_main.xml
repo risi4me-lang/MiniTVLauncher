@@ -21,11 +21,12 @@
 
     <!-- Soft top-to-bottom scrim gradient -->
     <View
+        android:id="@+id/mainScrim"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@drawable/scrim_gradient" />
 
-    <!-- Main Vertical Scroll View containing Header, Tools Row, and Category Rows -->
+    <!-- Main Vertical Scroll View containing Header, Top Shelf, Tools Row, and Category Rows -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/mainScrollView"
         android:layout_width="match_parent"
@@ -212,12 +213,77 @@
                 </LinearLayout>
             </RelativeLayout>
 
+            <!-- Top Shelf Hero Area (~180dp tall, glass-styled) -->
+            <FrameLayout
+                android:id="@+id/topShelfContainer"
+                android:layout_width="match_parent"
+                android:layout_height="180dp"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="12dp"
+                android:background="@drawable/glass_surface"
+                android:padding="20dp"
+                android:clipChildren="true"
+                android:clipToPadding="true">
+
+                <!-- Hero Background Layers for Crossfade -->
+                <ImageView
+                    android:id="@+id/topShelfBanner"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop" />
+
+                <ImageView
+                    android:id="@+id/topShelfBannerNext"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:alpha="0" />
+
+                <!-- Dark Gradient Scrim Overlay -->
+                <View
+                    android:id="@+id/topShelfScrim"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/scrim_gradient" />
+
+                <!-- Text Overlay -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/topShelfTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Welcome to Mini Launcher"
+                        android:textColor="#FFFFFF"
+                        android:textSize="28sp"
+                        android:fontFamily="sans-serif-light"
+                        android:ellipsize="end"
+                        android:singleLine="true" />
+
+                    <TextView
+                        android:id="@+id/topShelfSubtitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Select an app or tool to get started"
+                        android:textColor="#B0C0E0"
+                        android:textSize="14sp"
+                        android:fontFamily="sans-serif"
+                        android:layout_marginTop="4dp"
+                        android:ellipsize="end"
+                        android:singleLine="true" />
+                </LinearLayout>
+            </FrameLayout>
+
             <!-- Always-Visible Tools Compact Row (~24dp bottom margin to category header) -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/toolsRow"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="8dp"
                 android:layout_marginBottom="24dp"
                 android:clipToPadding="false"
                 android:clipChildren="false"

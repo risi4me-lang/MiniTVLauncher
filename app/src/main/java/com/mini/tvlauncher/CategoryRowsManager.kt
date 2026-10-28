@@ -20,7 +20,8 @@ class CategoryRowsManager(
     private val rowsContainer: RecyclerView,
     private val sharedViewPool: RecyclerView.RecycledViewPool,
     private val onAppClick: (AppEntry) -> Unit,
-    private val onAppLongClick: (AppEntry, View) -> Unit
+    private val onAppLongClick: (AppEntry, View) -> Unit,
+    private val onAppFocused: (AppEntry?) -> Unit
 ) {
 
     fun refreshAppLists(allInstalledApps: List<AppEntry>, getFavoritePkgs: () -> List<String>, getHiddenPkgs: () -> Set<String>) {
@@ -61,15 +62,17 @@ class CategoryRowsManager(
             }
         }
 
-        rowsContainer.adapter = CategoryRowAdapter(rowItems, sharedViewPool, onAppClick, onAppLongClick)
+        rowsContainer.adapter = CategoryRowAdapter(rowItems, sharedViewPool, prefs, onAppClick, onAppLongClick, onAppFocused)
     }
 }
 
 class CategoryRowAdapter(
     private val rows: List<CategoryRowItem>,
     private val sharedViewPool: RecyclerView.RecycledViewPool,
+    private val prefs: SharedPreferences,
     private val onAppClick: (AppEntry) -> Unit,
-    private val onAppLongClick: (AppEntry, View) -> Unit
+    private val onAppLongClick: (AppEntry, View) -> Unit,
+    private val onAppFocused: (AppEntry?) -> Unit
 ) : RecyclerView.Adapter<CategoryRowAdapter.VH>() {
 
     class VH(v: View) : RecyclerView.ViewHolder(v) {
@@ -92,7 +95,7 @@ class CategoryRowAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val row = rows[position]
         holder.rowTitle.text = row.title.uppercase(Locale.US)
-        val adapter = AppAdapter(holder.rowRecyclerView, onAppClick, onAppLongClick)
+        val adapter = AppAdapter(holder.rowRecyclerView, prefs, onAppClick, onAppLongClick, onAppFocused)
         holder.rowRecyclerView.adapter = adapter
         adapter.submit(row.apps)
     }
@@ -102,7 +105,8 @@ class CategoryRowAdapter(
 
 class ToolsAdapter(
     private val tiles: List<ToolTile>,
-    private val onClick: (ToolTile) -> Unit
+    private val onClick: (ToolTile) -> Unit,
+    private val onToolFocused: () -> Unit = {}
 ) : RecyclerView.Adapter<ToolsAdapter.VH>() {
 
     class VH(v: View) : RecyclerView.ViewHolder(v) {
@@ -126,6 +130,8 @@ class ToolsAdapter(
             val density = v.resources.displayMetrics.density
             val scale = if (focused) 1.1f else 1.0f
             val alpha = if (focused) 1f else 0f
+
+            if (focused) onToolFocused()
 
             h.cardContainer.animate()
                 .scaleX(scale)
@@ -155,8 +161,10 @@ class ToolsAdapter(
 
 class AppAdapter(
     private val recyclerView: RecyclerView,
+    private val prefs: SharedPreferences,
     private val onAppClick: (AppEntry) -> Unit,
-    private val onAppLongClick: (AppEntry, View) -> Unit
+    private val onAppLongClick: (AppEntry, View) -> Unit,
+    private val onAppFocused: (AppEntry?) -> Unit
 ) : RecyclerView.Adapter<AppAdapter.VH>() {
 
     private var items: List<AppEntry> = emptyList()
@@ -208,6 +216,11 @@ class AppAdapter(
             val scale = if (focused) 1.1f else 1.0f
             val alpha = if (focused) 1f else 0f
 
+            val pos = h.bindingAdapterPosition
+            if (focused && pos != RecyclerView.NO_POSITION && pos < items.size) {
+                onAppFocused(items[pos])
+            }
+
             h.cardContainer.animate()
                 .scaleX(scale)
                 .scaleY(scale)
@@ -240,6 +253,17 @@ class AppAdapter(
     override fun onBindViewHolder(h: VH, pos: Int) {
         val e = items[pos]
         h.label.text = e.label
+
+        val isBright = DisplayModeManager.getEffectiveMode(prefs) == "bright"
+        if (isBright) {
+            h.label.textSize = 15.5f
+            h.label.setTextColor(Color.WHITE)
+            h.label.setShadowLayer(4f, 0f, 2f, 0x80000000.toInt())
+        } else {
+            h.label.textSize = 14.0f
+            h.label.setTextColor(0xFFE2E8F0.toInt())
+            h.label.setShadowLayer(0f, 0f, 0f, 0)
+        }
 
         if (e.banner != null) {
             h.cardImage.setImageDrawable(e.banner)

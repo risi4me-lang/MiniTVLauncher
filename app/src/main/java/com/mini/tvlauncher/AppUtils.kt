@@ -132,16 +132,65 @@ object AppUtils {
         } catch (_: Exception) { emptyMap() }
     }
 
+    fun getLastLaunchedMap(prefs: SharedPreferences): Map<String, Long> {
+        val jsonStr = prefs.getString("app_last_launched_map", "{}") ?: "{}"
+        return try {
+            val obj = JSONObject(jsonStr)
+            val map = HashMap<String, Long>()
+            val keys = obj.keys()
+            while (keys.hasNext()) {
+                val k = keys.next()
+                map[k] = obj.getLong(k)
+            }
+            map
+        } catch (_: Exception) { emptyMap() }
+    }
+
     fun incrementLaunchCount(prefs: SharedPreferences, pkg: String) {
         val map = getLaunchCounts(prefs).toMutableMap()
         map[pkg] = (map[pkg] ?: 0) + 1
         val obj = JSONObject()
         map.forEach { (k, v) -> obj.put(k, v) }
-        prefs.edit().putString("app_launch_counts", obj.toString()).apply()
+
+        val lastMap = getLastLaunchedMap(prefs).toMutableMap()
+        lastMap[pkg] = System.currentTimeMillis()
+        val lastObj = JSONObject()
+        lastMap.forEach { (k, v) -> lastObj.put(k, v) }
+
+        prefs.edit()
+            .putString("app_launch_counts", obj.toString())
+            .putString("app_last_launched_map", lastObj.toString())
+            .apply()
     }
 
     fun resetLaunchCounts(prefs: SharedPreferences) {
-        prefs.edit().remove("app_launch_counts").apply()
+        prefs.edit().remove("app_launch_counts").remove("app_last_launched_map").apply()
+    }
+
+    fun formatLastLaunchedSubtitle(app: AppEntry, prefs: SharedPreferences): String {
+        val category = getAppCategory(app, prefs)
+        val count = app.launchCount
+        val timesStr = if (count == 1) "opened 1 time" else "opened $count times"
+
+        val lastMs = app.lastLaunchedMs
+        val lastStr = if (lastMs <= 0L) {
+            "never opened"
+        } else {
+            val diffMs = System.currentTimeMillis() - lastMs
+            val diffMinutes = diffMs / (60 * 1000L)
+            val diffHours = diffMs / (60 * 60 * 1000L)
+            val diffDays = diffMs / (24 * 60 * 60 * 1000L)
+
+            when {
+                diffMinutes < 1 -> "opened just now"
+                diffMinutes < 60 -> "opened ${diffMinutes}m ago"
+                diffHours < 24 -> "opened ${diffHours}h ago"
+                diffDays == 1L -> "last used yesterday"
+                else -> "last used $diffDays days ago"
+            }
+        }
+
+        return "$category · $timesStr · $lastStr"
     }
 
     fun processAppList(
@@ -151,6 +200,7 @@ object AppUtils {
     ): List<AppEntry> {
         val renameMap = getRenameMap(prefs)
         val launchCounts = getLaunchCounts(prefs)
+        val lastLaunchedMap = getLastLaunchedMap(prefs)
         val sortMode = prefs.getString("app_sort_mode", "alphabetical") ?: "alphabetical"
         val cardsDir = File(filesDir, "cards")
 
@@ -158,6 +208,7 @@ object AppUtils {
             val customName = renameMap[app.pkg]
             val displayName = if (!customName.isNullOrBlank()) customName else app.defaultLabel
             val count = launchCounts[app.pkg] ?: 0
+            val lastLaunched = lastLaunchedMap[app.pkg] ?: 0L
             val customCardFile = File(cardsDir, "${app.pkg}.jpg")
             val hasCustomImage = customCardFile.exists()
 
@@ -174,6 +225,7 @@ object AppUtils {
                 label = displayName,
                 banner = finalBanner,
                 launchCount = count,
+                lastLaunchedMs = lastLaunched,
                 hasCustomImage = hasCustomImage
             )
         }
@@ -242,7 +294,6 @@ object AppUtils {
         val idToUse = if (!targetId.isNullOrBlank()) {
             targetId
         } else {
-            // Find first free id from 1 to 8
             var foundId: String? = null
             for (i in 1..8) {
                 val candidate = "wp_$i"
@@ -251,7 +302,7 @@ object AppUtils {
                     break
                 }
             }
-            foundId ?: return null // Reached 8 limit
+            foundId ?: return null
         }
 
         return try {

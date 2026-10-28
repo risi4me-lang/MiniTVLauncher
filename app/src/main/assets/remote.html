@@ -17,22 +17,18 @@
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
 body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none; -webkit-user-select: none; padding-bottom: 76px; min-height: 100vh; }
 
-/* Toast Notification */
 .toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-100px); background: var(--accent); color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: 500; box-shadow: 0 4px 16px rgba(0,0,0,0.4); opacity: 0; transition: all 0.3s ease; z-index: 1000; pointer-events: none; max-width: 90%; text-align: center; }
 .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 .toast.error { background: #e63946; }
 
-/* Glass Tab Bar */
 .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 64px; background: rgba(13, 19, 34, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid var(--glass-border); display: flex; justify-content: space-around; align-items: center; z-index: 200; }
 .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #7080a0; font-size: 11px; font-weight: 500; cursor: pointer; border: none; background: none; gap: 4px; }
 .tab-item.active { color: var(--accent); }
 .tab-item svg { width: 22px; height: 22px; fill: currentColor; }
 
-/* Views */
 .view { display: none; padding: 12px 16px; max-width: 440px; margin: 0 auto; }
 .view.active { display: block; }
 
-/* Remote Controls */
 .pad-row { display: flex; gap: 8px; max-width: 280px; margin: 8px auto; }
 .dpad-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 280px; margin: 4px auto; }
 .btn-remote { min-height: 56px; border-radius: 16px; border: 1px solid var(--glass-border); background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: #fff; font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center; cursor: pointer; touch-action: none; position: relative; flex: 1; box-shadow: 0 4px 16px rgba(0,0,0,0.2); transition: all 0.15s ease; }
@@ -42,11 +38,9 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
 .btn-remote.power:active { background: #e63946; color: #fff; }
 .btn-remote svg { width: 22px; height: 22px; fill: currentColor; }
 
-/* Accessibility Dot Indicator */
 .dot { position: absolute; top: 6px; right: 8px; width: 6px; height: 6px; border-radius: 50%; background: #ff4d4d; display: none; }
 .btn-remote.has-dot .dot { display: block; }
 
-/* Swipe Pad */
 .swipe-pad { max-width: 280px; height: 100px; margin: 8px auto; background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 2px dashed var(--accent); border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #a0b0d0; font-size: 13px; font-weight: 500; gap: 4px; touch-action: none; cursor: pointer; }
 .swipe-pad svg { width: 22px; height: 22px; fill: var(--accent); }
 
@@ -54,7 +48,6 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
 .btn-open-tools { flex: 1; min-height: 48px; background: rgba(255,255,255,0.08); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: 14px; color: #fff; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
 .btn-open-tools svg { width: 18px; height: 18px; fill: currentColor; }
 
-/* Quick Apps Grid */
 .quick-apps-header { display: flex; align-items: center; justify-content: space-between; margin: 18px auto 10px; max-width: 300px; }
 .quick-apps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 300px; margin: 0 auto 16px; }
 .quick-tile { background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: 16px; padding: 10px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; min-height: 88px; transition: all 0.15s ease; }
@@ -64,7 +57,6 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
 
 .btn-text { background: none; border: none; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; }
 
-/* Glass Bottom Sheet */
 .sheet-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; pointer-events: none; transition: opacity 0.25s ease; z-index: 500; }
 .sheet-backdrop.open { opacity: 1; pointer-events: auto; }
 .sheet { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(13, 19, 34, 0.92); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-top: 1px solid var(--glass-border-light); border-top-left-radius: 28px; border-top-right-radius: 28px; padding: 20px; max-width: 500px; margin: 0 auto; transform: translateY(100%); transition: transform 0.28s cubic-bezier(0.1, 0.9, 0.2, 1); z-index: 501; max-height: 85vh; overflow-y: auto; }
@@ -74,7 +66,6 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
 .sheet-close { background: var(--glass-bg); border: 1px solid var(--glass-border); color: #a0b0d0; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .sheet-close svg { width: 16px; height: 16px; fill: currentColor; }
 
-/* Cards & Form Controls */
 .section-title { font-size: 12px; font-weight: 600; color: #8090b0; text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 8px; }
 .card { background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: 18px; padding: 14px; margin-bottom: 12px; }
 .input-field { width: 100%; min-height: 48px; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--glass-border); border-radius: 12px; color: #fff; padding: 0 14px; font-size: 15px; outline: none; user-select: text; -webkit-user-select: text; }
@@ -85,7 +76,6 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
 .btn-secondary { background: var(--glass-bg); border: 1px solid var(--glass-border); color: #a0b0d0; box-shadow: none; }
 .btn-danger { background: rgba(230, 57, 70, 0.2); border: 1px solid rgba(230, 57, 70, 0.4); color: #ff6b6b; box-shadow: none; }
 
-/* App List Items */
 .app-item { display: flex; align-items: center; justify-content: space-between; background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--glass-border); padding: 12px 16px; border-radius: 16px; margin-bottom: 8px; cursor: pointer; min-height: 56px; transition: all 0.15s ease; }
 .app-item:active { background: var(--glass-bg-active); border-color: var(--accent); }
 .app-info { display: flex; flex-direction: column; overflow: hidden; margin-right: 12px; }
@@ -104,7 +94,6 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
 
 <div id="toast" class="toast"></div>
 
-<!-- Login Container -->
 <div id="loginView">
   <h3 style="margin-bottom:12px;color:#fff">Pair Remote</h3>
   <p style="color:#7080a0;font-size:14px;margin-bottom:16px">Enter 4-digit PIN shown on TV</p>
@@ -112,7 +101,6 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
   <button onclick="go()" class="btn" style="margin-top:16px">Connect</button>
 </div>
 
-<!-- Main App Container -->
 <div id="mainView" style="display:none">
 
   <!-- Remote Tab -->
@@ -196,6 +184,24 @@ body { margin: 0; background: var(--bg-gradient); color: #fff; user-select: none
       <div class="check-row">
         <span>Group Apps by Category</span>
         <input type="checkbox" id="groupByCategory">
+      </div>
+      <div style="margin-top:12px">
+        <label class="section-title">Display Mode</label>
+        <select id="displayMode" class="select-field">
+          <option value="standard">Standard</option>
+          <option value="bright">Bright Room</option>
+          <option value="auto">Auto (Configurable Time)</option>
+        </select>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <div style="flex:1">
+          <label class="section-title">Auto Start</label>
+          <input type="time" id="displayAutoStart" class="input-field" value="08:00">
+        </div>
+        <div style="flex:1">
+          <label class="section-title">Auto End</label>
+          <input type="time" id="displayAutoEnd" class="input-field" value="18:00">
+        </div>
       </div>
       <div style="margin-top:12px">
         <label class="section-title">Sort Apps By</label>
@@ -420,7 +426,6 @@ function closeSheets() {
   document.querySelectorAll('.sheet').forEach(s => s.classList.remove('open'));
 }
 
-// Throttled Key Queue
 function queueKey(kName) {
   if (keyQueue.length >= 5) keyQueue.splice(0, keyQueue.length - 4);
   keyQueue.push(kName);
@@ -529,7 +534,6 @@ function updateAccDots(enabled) {
   });
 }
 
-// Hold-to-Repeat Binding for Arrow Buttons
 function bindHoldRepeat(element, keyName) {
   let holdTimer = null;
   let repeatInterval = null;
@@ -567,7 +571,6 @@ bindHoldRepeat(document.getElementById('btnOk'), 'ok');
 document.getElementById('btnBack').addEventListener('click', () => { checkAccAndWarn(); queueKey('back'); });
 document.getElementById('btnHome').addEventListener('click', () => { checkAccAndWarn(); queueKey('home'); });
 
-// Swipe Pad
 const swipeArea = document.getElementById('swipeArea');
 let startX = 0, startY = 0, startTime = 0;
 let lastStepX = 0, lastStepY = 0;
@@ -615,7 +618,6 @@ function endSwipe(e) {
 swipeArea.addEventListener('pointerup', endSwipe);
 swipeArea.addEventListener('pointercancel', endSwipe);
 
-// Volume & Power
 document.getElementById('btnVolUp').addEventListener('click', () => api('/volume?action=up', { method: 'POST' }));
 document.getElementById('btnVolDown').addEventListener('click', () => api('/volume?action=down', { method: 'POST' }));
 document.getElementById('btnVolMute').addEventListener('click', () => api('/volume?action=mute', { method: 'POST' }));
@@ -1129,6 +1131,9 @@ function loadSettings() {
     document.getElementById('screensaverTimeout').value = s.screensaverTimeout !== undefined ? s.screensaverTimeout : 0;
     document.getElementById('weatherCity').value = s.weatherCity || '';
     document.getElementById('weatherUnit').value = s.weatherUnit || 'c';
+    document.getElementById('displayMode').value = s.displayMode || 'standard';
+    document.getElementById('displayAutoStart').value = s.displayAutoStart || '08:00';
+    document.getElementById('displayAutoEnd').value = s.displayAutoEnd || '18:00';
     updateAccDots(s.accessibilityEnabled !== false);
   }).catch(() => {});
 }
@@ -1145,7 +1150,10 @@ function saveSettings() {
     slideshowInterval: parseInt(document.getElementById('slideshowInterval').value) || 0,
     screensaverTimeout: parseInt(document.getElementById('screensaverTimeout').value) || 0,
     weatherCity: document.getElementById('weatherCity').value.trim(),
-    weatherUnit: document.getElementById('weatherUnit').value
+    weatherUnit: document.getElementById('weatherUnit').value,
+    displayMode: document.getElementById('displayMode').value,
+    displayAutoStart: document.getElementById('displayAutoStart').value || '08:00',
+    displayAutoEnd: document.getElementById('displayAutoEnd').value || '18:00'
   };
   api('/settings', {
     method: 'POST',
