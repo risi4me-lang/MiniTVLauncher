@@ -17,6 +17,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.security.MessageDigest
+import java.text.SimpleDateFormat
 import java.util.*
 
 class RemoteService : Service(), RemoteHost {
@@ -49,6 +50,7 @@ class RemoteService : Service(), RemoteHost {
 
     override fun onCreate() {
         super.onCreate()
+        CrashHandler.install(this)
         startForegroundSafely()
 
         val npm = NowPlayingManager(this).also { it.start() }
@@ -178,6 +180,16 @@ class RemoteService : Service(), RemoteHost {
 
     override fun getErrorsText(): String {
         val sb = StringBuilder()
+        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+
+        // 1. Uncaught Exception Crashes
+        val crashFile = File(filesDir, "last_crash.txt")
+        if (crashFile.exists()) {
+            sb.append("=== Recent Uncaught Exceptions (filesDir/last_crash.txt) ===\n")
+            sb.append(crashFile.readText().trim()).append("\n\n")
+        }
+
+        // 2. ApplicationExitInfo
         if (Build.VERSION.SDK_INT >= 30) {
             try {
                 val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
@@ -185,14 +197,53 @@ class RemoteService : Service(), RemoteHost {
                 if (exitInfos != null && exitInfos.isNotEmpty()) {
                     sb.append("=== ApplicationExitInfo (last 10) ===\n")
                     exitInfos.forEach { ei ->
-                        sb.append("- Reason=").append(ei.reason).append(": ").append(ei.description ?: "no description").append("\n")
+                        val importanceStr = when (ei.importance) {
+                            ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND -> "FOREGROUND"
+                            ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE -> "FOREGROUND_SERVICE"
+                            ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE -> "VISIBLE"
+                            ActivityManager.RunningAppProcessInfo.IMPORTANCE_PERCEPTIBLE -> "PERCEPTIBLE"
+                            ActivityManager.RunningAppProcessInfo.IMPORTANCE_BACKGROUND -> "BACKGROUND"
+                            ActivityManager.RunningAppProcessInfo.IMPORTANCE_EMPTY -> "EMPTY"
+                            else -> "IMPORTANCE_${ei.importance}"
+                        }
+
+                        val reasonStr = when (ei.reason) {
+                            ApplicationExitInfo.REASON_ANR -> "ANR"
+                            ApplicationExitInfo.REASON_CRASH -> "CRASH"
+                            ApplicationExitInfo.REASON_CRASH_NATIVE -> "CRASH_NATIVE"
+                            ApplicationExitInfo.REASON_EXIT_SELF -> "EXIT_SELF"
+                            ApplicationExitInfo.REASON_INITIALIZATION_FAILURE -> "INITIALIZATION_FAILURE"
+                            ApplicationExitInfo.REASON_LOW_MEMORY -> "LOW_MEMORY"
+                            ApplicationExitInfo.REASON_OTHER -> "OTHER"
+                            ApplicationExitInfo.REASON_PERMISSION_CHANGE -> "PERMISSION_CHANGE"
+                            ApplicationExitInfo.REASON_SIGNALED -> "SIGNALED"
+                            ApplicationExitInfo.REASON_USER_REQUESTED -> "USER_REQUESTED"
+                            ApplicationExitInfo.REASON_USER_STOPPED -> "USER_STOPPED"
+                            else -> "REASON_${ei.reason}"
+                        }
+
+                        sb.append("- [").append(sdf.format(Date(ei.timestamp))).append("]")
+                        sb.append(" Reason=").append(reasonStr)
+                        sb.append(", Importance=").append(importanceStr)
+                        sb.append(", Description=").append(ei.description ?: "none").append("\n")
+
+                        try {
+                            val traceStream = ei.traceInputStream
+                            if (traceStream != null) {
+                                val traceText = traceStream.bufferedReader().use { it.readText() }.trim()
+                                if (traceText.isNotEmpty()) {
+                                    sb.append("  Trace:\n  ").append(traceText.replace("\n", "\n  ")).append("\n")
+                                }
+                            }
+                        } catch (_: Exception) {}
                     }
                     sb.append("\n")
                 }
             } catch (_: Exception) {}
         }
 
-        sb.append("=== Recent Fatal / Runtime Errors ===\n")
+        // 3. Logcat Fatal / Runtime Errors
+        sb.append("=== Recent Fatal / Runtime Errors (Logcat) ===\n")
         try {
             val process = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-t", "300"))
             process.inputStream.bufferedReader().useLines { lines ->

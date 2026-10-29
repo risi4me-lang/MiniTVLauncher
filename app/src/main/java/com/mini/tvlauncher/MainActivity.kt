@@ -111,6 +111,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        CrashHandler.install(this)
         setContentView(R.layout.activity_main)
 
         try { prefs.registerOnSharedPreferenceChangeListener(prefChangeListener) } catch (_: Exception) {}
