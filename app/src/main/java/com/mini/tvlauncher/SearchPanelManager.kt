@@ -1,7 +1,6 @@
 package com.mini.tvlauncher
 
 import android.app.Activity
-import android.app.SearchManager
 import android.content.Intent
 import android.net.Uri
 import android.text.Editable
@@ -116,20 +115,14 @@ class SearchPanelManager(
             return
         }
         try {
-            val intent = Intent(Intent.ACTION_WEB_SEARCH).apply {
-                putExtra(SearchManager.QUERY, q)
+            val url = "https://www.google.com/search?q=" + Uri.encode(q)
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             activity.startActivity(intent)
+            close()
         } catch (_: Exception) {
-            try {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=" + Uri.encode(q))).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                activity.startActivity(intent)
-            } catch (_: Exception) {
-                Toast.makeText(activity, "Cannot open web browser", Toast.LENGTH_SHORT).show()
-            }
+            Toast.makeText(activity, "No browser or web search app available", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -142,18 +135,20 @@ class SearchPanelManager(
         try {
             val intent = Intent(Intent.ACTION_SEARCH).apply {
                 setPackage("com.google.android.youtube.tv")
-                putExtra(SearchManager.QUERY, q)
+                putExtra("query", q)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             activity.startActivity(intent)
+            close()
         } catch (_: Exception) {
             try {
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/results?search_query=" + Uri.encode(q))).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 activity.startActivity(intent)
+                close()
             } catch (_: Exception) {
-                Toast.makeText(activity, "Cannot search YouTube", Toast.LENGTH_SHORT).show()
+                Toast.makeText(activity, "No YouTube app or browser available", Toast.LENGTH_SHORT).show()
             }
         }
     }

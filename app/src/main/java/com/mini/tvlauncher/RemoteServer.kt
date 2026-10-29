@@ -103,10 +103,11 @@ class RemoteServer(private val pin: String, private val host: RemoteHost) {
                 URLDecoder.decode(it.substringAfter("="), "UTF-8")
         }
 
-    private fun reply(out: OutputStream, code: Int, type: String, body: ByteArray) {
-        val head = "HTTP/1.1 $code X\r\nContent-Type: $type\r\nContent-Length: ${body.size}\r\n" +
-            "Connection: close\r\nCache-Control: no-store\r\n\r\n"
-        out.write(head.toByteArray()); out.write(body); out.flush()
+    private fun reply(out: OutputStream, code: Int, type: String, body: ByteArray, extraHeaders: Map<String, String> = emptyMap()) {
+        val sb = StringBuilder("HTTP/1.1 $code OK\r\nContent-Type: $type\r\nContent-Length: ${body.size}\r\nConnection: close\r\nCache-Control: no-store\r\n")
+        extraHeaders.forEach { (k, v) -> sb.append(k).append(": ").append(v).append("\r\n") }
+        sb.append("\r\n")
+        out.write(sb.toString().toByteArray()); out.write(body); out.flush()
     }
 
     private fun handle(s: Socket) {
@@ -256,6 +257,14 @@ class RemoteServer(private val pin: String, private val host: RemoteHost) {
                         val incApps = q["apps"] == "1" || q["apps"] == "true"
                         val reportText = host.getDeviceReport(incApps)
                         reply(out, 200, "text/plain; charset=utf-8", reportText.toByteArray(Charsets.UTF_8))
+                    }
+                    "/report/download" -> {
+                        val incApps = q["apps"] == "1" || q["apps"] == "true"
+                        val reportText = host.getDeviceReport(incApps)
+                        reply(
+                            out, 200, "text/plain; charset=utf-8", reportText.toByteArray(Charsets.UTF_8),
+                            mapOf("Content-Disposition" to "attachment; filename=\"device-report.txt\"")
+                        )
                     }
                     "/keylog" -> {
                         if (method == "GET") {

@@ -14,11 +14,15 @@ import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.media.AudioManager
+import android.media.tv.TvContract
+import android.media.tv.TvInputManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.os.StatFs
 import android.provider.Settings
 import android.view.*
 import android.view.animation.DecelerateInterpolator
@@ -112,6 +116,14 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         CrashHandler.install(this)
+
+        if (!prefs.contains("low_ram_mode")) {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+            if (am != null && am.isLowRamDevice) {
+                prefs.edit().putBoolean("low_ram_mode", true).apply()
+            }
+        }
+
         setContentView(R.layout.activity_main)
 
         try { prefs.registerOnSharedPreferenceChangeListener(prefChangeListener) } catch (_: Exception) {}
@@ -459,15 +471,16 @@ class MainActivity : Activity() {
         val intents = listOf(
             Intent("android.speech.action.VOICE_SEARCH_HANDS_FREE"),
             Intent("android.intent.action.VOICE_COMMAND"),
-            Intent(Intent.ACTION_ASSIST)
+            Intent("android.speech.action.RECOGNIZE_SPEECH")
         )
         for (intent in intents) {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             @Suppress("DEPRECATION")
-            val matches = pm.queryIntentActivities(intent, 0)
+            val matches = pm.queryIntentActivities(intent, 0).filter { it.activityInfo.packageName != "com.android.tv.frameworkpackagestubs" }
             if (matches.isNotEmpty()) {
+                val resolvedIntent = Intent(intent).setClassName(matches[0].activityInfo.packageName, matches[0].activityInfo.name)
                 return try {
-                    startActivity(intent)
+                    startActivity(resolvedIntent)
                     null
                 } catch (_: Exception) { null }
             }
@@ -807,7 +820,7 @@ class MainActivity : Activity() {
         fun checkAndAdd(id: String, label: String, iconRes: Int, intent: Intent) {
             try {
                 @Suppress("DEPRECATION")
-                val matches = pm.queryIntentActivities(intent, 0)
+                val matches = pm.queryIntentActivities(intent, 0).filter { it.activityInfo.packageName != "com.android.tv.frameworkpackagestubs" }
                 if (matches.isNotEmpty()) {
                     val resolvedIntent = Intent(intent)
                     if (resolvedIntent.component == null) {
@@ -821,16 +834,42 @@ class MainActivity : Activity() {
         }
 
         result.add(ToolTile("power", "Power", R.drawable.ic_tool_power, Intent()))
+
+        // TvInputManager passthrough inputs (HDMI / AV)
+        try {
+            val tvInputManager = getSystemService(Context.TV_INPUT_SERVICE) as? TvInputManager
+            val inputs = tvInputManager?.tvInputList ?: emptyList()
+            inputs.filter { it.isPassthroughInput }.forEach { info ->
+                val label = info.loadLabel(this)?.toString() ?: info.id
+                val uri = TvContract.buildChannelUriForPassthroughInput(info.id)
+                val intent = Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                result.add(ToolTile("input_${info.id}", label, R.drawable.ic_shortcut_source, intent))
+            }
+        } catch (_: Exception) {}
+
         result.add(ToolTile("projector_setup", "Projector Setup", R.drawable.ic_tool_display, Intent(this, ProjectorSetupActivity::class.java)))
+
+        // Droidlogic Projector Settings
+        try {
+            val dlIntent = Intent(Intent.ACTION_MAIN).setPackage("com.droidlogic.tv.settings")
+            @Suppress("DEPRECATION")
+            val dlMatches = pm.queryIntentActivities(dlIntent, 0)
+            if (dlMatches.isNotEmpty()) {
+                val ri = dlMatches[0]
+                val projIntent = Intent().setClassName(ri.activityInfo.packageName, ri.activityInfo.name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                result.add(ToolTile("projector_settings", "Projector Settings", R.drawable.ic_tool_settings, projIntent))
+            }
+        } catch (_: Exception) {}
+
         result.add(ToolTile("device_report", "Device Report", R.drawable.ic_tool_settings, Intent()))
         result.add(ToolTile("media_access", "Enable Media Access", R.drawable.ic_tool_settings, Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)))
         result.add(ToolTile("default_home", "Default Home", R.drawable.ic_tool_launcher, Intent()))
         result.add(ToolTile("key_tester", "Key Tester", R.drawable.ic_tool_settings, Intent()))
 
         checkAndAdd("settings", "Settings", R.drawable.ic_tool_settings, Intent(Settings.ACTION_SETTINGS))
+        checkAndAdd("sound_settings", "Sound & Display", R.drawable.ic_tool_display, Intent(Settings.ACTION_SOUND_SETTINGS))
         checkAndAdd("wifi", "Wi-Fi", R.drawable.ic_tool_wifi, Intent(Settings.ACTION_WIFI_SETTINGS))
         checkAndAdd("bluetooth", "Pair Speaker", R.drawable.ic_tool_bluetooth, Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
-        checkAndAdd("display", "Display", R.drawable.ic_tool_display, Intent(Settings.ACTION_DISPLAY_SETTINGS))
 
         val mode = prefs.getString("home_qr_mode", "always") ?: "always"
         val hasPaired = qrPairingManager.getPairedDevicesList().isNotEmpty()
@@ -920,7 +959,7 @@ class MainActivity : Activity() {
     private fun resolveIntent(pm: PackageManager, intent: Intent): Intent? {
         return try {
             @Suppress("DEPRECATION")
-            val matches = pm.queryIntentActivities(intent, 0)
+            val matches = pm.queryIntentActivities(intent, 0).filter { it.activityInfo.packageName != "com.android.tv.frameworkpackagestubs" }
             if (matches.isNotEmpty()) {
                 val ri = matches[0]
                 val resolved = Intent(intent)
@@ -1058,7 +1097,7 @@ class MainActivity : Activity() {
                     @Suppress("DEPRECATION")
                     for (ri in pm.queryIntentActivities(q, 0)) {
                         val pkg = ri.activityInfo.packageName
-                        if (pkg == packageName || !seen.add(pkg)) continue
+                        if (pkg == packageName || pkg == "com.android.tv.frameworkpackagestubs" || !seen.add(pkg)) continue
                         val i = Intent(Intent.ACTION_MAIN).addCategory(cat)
                             .setClassName(pkg, ri.activityInfo.name)
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

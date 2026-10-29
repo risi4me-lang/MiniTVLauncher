@@ -1,20 +1,17 @@
 package com.mini.tvlauncher
 
 import android.app.ActivityManager
-import android.app.ApplicationExitInfo
-import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.hardware.display.DisplayManager
+import android.media.tv.TvInputInfo
+import android.media.tv.TvInputManager
 import android.os.Build
-import android.os.Debug
 import android.os.Environment
-import android.os.PowerManager
 import android.os.StatFs
 import android.provider.Settings
-import android.util.DisplayMetrics
 import android.view.Display
 import android.view.InputDevice
 import java.io.File
@@ -62,7 +59,6 @@ object DeviceReportCollector {
                 } catch (_: Exception) {}
             }
 
-            // Selected Getprop properties
             sb.append("\n[Getprop Properties]\n")
             val propLines = runGetpropFiltered()
             if (propLines.isNotEmpty()) {
@@ -102,7 +98,6 @@ object DeviceReportCollector {
                 sb.append("Large Memory Class: ").append(am.largeMemoryClass).append(" MB\n")
             }
 
-            // StatFs Storage
             sb.append("\n[Storage StatFs]\n")
             try {
                 val dataFs = StatFs(Environment.getDataDirectory().path)
@@ -118,7 +113,6 @@ object DeviceReportCollector {
                 sb.append("Cache Total: ").append(cacheTotal).append(" MB, Available: ").append(cacheAvail).append(" MB\n")
             } catch (_: Exception) {}
 
-            // Display
             sb.append("\n[Display & Metrics]\n")
             val dm = context.resources.displayMetrics
             sb.append("Resolution: ").append(dm.widthPixels).append("x").append(dm.heightPixels).append("\n")
@@ -132,37 +126,62 @@ object DeviceReportCollector {
                     val modes = display.supportedModes.joinToString(", ") { "${it.physicalWidth}x${it.physicalHeight}@${it.refreshRate}Hz" }
                     sb.append("Supported Modes: ").append(modes).append("\n")
                 }
-                if (Build.VERSION.SDK_INT >= 24) {
-                    val hdr = display.hdrCapabilities
-                    if (hdr != null) {
-                        val types = hdr.supportedHdrTypes.joinToString(", ")
-                        sb.append("HDR Supported Types: ").append(if (types.isEmpty()) "None" else types).append("\n")
-                    }
-                }
             }
-
-            // Thermal
-            if (Build.VERSION.SDK_INT >= 29) {
-                try {
-                    val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
-                    if (pm != null) {
-                        sb.append("Thermal Status: ").append(pm.currentThermalStatus).append("\n")
-                    }
-                } catch (_: Exception) {}
-            }
-
-            // Process Memory
-            sb.append("\n[Launcher Process Memory]\n")
-            sb.append("Allocated Native Heap: ").append(Debug.getNativeHeapAllocatedSize() / 1024).append(" KB\n")
-            sb.append("JVM Heap Total: ").append(Runtime.getRuntime().totalMemory() / 1024).append(" KB\n")
-            sb.append("JVM Heap Free: ").append(Runtime.getRuntime().freeMemory() / 1024).append(" KB\n")
         } catch (e: Exception) {
             sb.append("unavailable: ").append(e.message).append("\n")
         }
         sb.append("\n")
 
-        // 3. Features
-        sb.append("--- [3. SYSTEM FEATURES] ---\n")
+        // 3. TV Inputs (TvInputManager)
+        sb.append("--- [3. TV INPUTS (TvInputManager)] ---\n")
+        try {
+            val tvInputManager = context.getSystemService(Context.TV_INPUT_SERVICE) as? TvInputManager
+            val inputs = tvInputManager?.tvInputList ?: emptyList()
+            if (inputs.isNotEmpty()) {
+                inputs.forEach { info ->
+                    val label = info.loadLabel(context) ?: info.id
+                    sb.append("- ID: ").append(info.id)
+                    sb.append(", Label: ").append(label)
+                    sb.append(", Type: ").append(info.type)
+                    sb.append(", Passthrough: ").append(info.isPassthroughInput)
+                    sb.append("\n")
+                }
+            } else {
+                sb.append("No TV inputs registered\n")
+            }
+        } catch (e: Exception) {
+            sb.append("unavailable: ").append(e.message).append("\n")
+        }
+        sb.append("\n")
+
+        // 4. Vendor / Droidlogic Specific Packages
+        sb.append("--- [4. VENDOR & DROIDLOGIC PACKAGES] ---\n")
+        try {
+            val pm = context.packageManager
+            val packages = pm.getInstalledPackages(PackageManager.GET_ACTIVITIES)
+            val vendorPkgs = packages.filter { pkg ->
+                val name = pkg.packageName.lowercase(Locale.US)
+                name.startsWith("com.droidlogic.") || name.startsWith("com.tcl.") ||
+                name.contains("hdmi") || name.contains("keystone") || name.contains("projector") || name.contains("source")
+            }
+
+            if (vendorPkgs.isNotEmpty()) {
+                vendorPkgs.forEach { pkg ->
+                    sb.append("- Package: ").append(pkg.packageName).append("\n")
+                    pkg.activities?.forEach { act ->
+                        sb.append("   Activity: ").append(act.name).append("\n")
+                    }
+                }
+            } else {
+                sb.append("No vendor specific packages found\n")
+            }
+        } catch (e: Exception) {
+            sb.append("unavailable: ").append(e.message).append("\n")
+        }
+        sb.append("\n")
+
+        // 5. System Features
+        sb.append("--- [5. SYSTEM FEATURES] ---\n")
         try {
             val pm = context.packageManager
             val features = pm.systemAvailableFeatures
@@ -170,16 +189,14 @@ object DeviceReportCollector {
                 features.filter { it.name != null }.sortedBy { it.name }.forEach { f ->
                     sb.append("- ").append(f.name).append("\n")
                 }
-            } else {
-                sb.append("unavailable: no features returned\n")
             }
         } catch (e: Exception) {
             sb.append("unavailable: ").append(e.message).append("\n")
         }
         sb.append("\n")
 
-        // 4. Launchers
-        sb.append("--- [4. LAUNCHER ACTIVITIES & ROLES] ---\n")
+        // 6. Launchers
+        sb.append("--- [6. LAUNCHER ACTIVITIES & ROLES] ---\n")
         try {
             val pm = context.packageManager
             val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
@@ -192,22 +209,13 @@ object DeviceReportCollector {
             val resolvedDefault = pm.resolveActivity(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
             val defaultPkg = resolvedDefault?.activityInfo?.packageName ?: "None"
             sb.append("Default Resolved Home Package: ").append(defaultPkg).append("\n")
-
-            if (Build.VERSION.SDK_INT >= 29) {
-                val rm = context.getSystemService(RoleManager::class.java)
-                if (rm != null) {
-                    val available = rm.isRoleAvailable(RoleManager.ROLE_HOME)
-                    val held = rm.isRoleHeld(RoleManager.ROLE_HOME)
-                    sb.append("RoleManager Home Role Available: ").append(available).append(", Held by us: ").append(held).append("\n")
-                }
-            }
         } catch (e: Exception) {
             sb.append("unavailable: ").append(e.message).append("\n")
         }
         sb.append("\n")
 
-        // 5. Intent Probes
-        sb.append("--- [5. INTENT PROBES] ---\n")
+        // 7. Intent Probes
+        sb.append("--- [7. INTENT PROBES] ---\n")
         try {
             val pm = context.packageManager
             val probeActions = listOf(
@@ -218,11 +226,8 @@ object DeviceReportCollector {
                 "android.settings.SOUND_SETTINGS",
                 "android.settings.HOME_SETTINGS",
                 "android.settings.APPLICATION_SETTINGS",
-                "android.settings.MANAGE_ALL_APPLICATIONS_SETTINGS",
                 "android.settings.ACCESSIBILITY_SETTINGS",
                 "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS",
-                "android.settings.CAST_SETTINGS",
-                "android.settings.INPUT_METHOD_SETTINGS",
                 "android.intent.action.ASSIST",
                 "android.intent.action.VOICE_COMMAND",
                 "android.intent.action.WEB_SEARCH",
@@ -233,20 +238,31 @@ object DeviceReportCollector {
             probeActions.forEach { action ->
                 val intent = Intent(action)
                 val matches = pm.queryIntentActivities(intent, 0)
-                if (matches.isNotEmpty()) {
-                    val matchStr = matches.joinToString(", ") { "${it.activityInfo.packageName}/${it.activityInfo.name}" }
+                val filtered = matches.filter { it.activityInfo.packageName != "com.android.tv.frameworkpackagestubs" }
+                if (filtered.isNotEmpty()) {
+                    val matchStr = filtered.joinToString(", ") { "${it.activityInfo.packageName}/${it.activityInfo.name}" }
                     sb.append(action).append(" -> ").append(matchStr).append("\n")
                 } else {
                     sb.append(action).append(" -> NONE\n")
                 }
+            }
+
+            // Probe com.droidlogic.tv.settings
+            val dlIntent = Intent(Intent.ACTION_MAIN).setPackage("com.droidlogic.tv.settings")
+            val dlMatches = pm.queryIntentActivities(dlIntent, 0)
+            if (dlMatches.isNotEmpty()) {
+                val dlStr = dlMatches.joinToString(", ") { "${it.activityInfo.packageName}/${it.activityInfo.name}" }
+                sb.append("com.droidlogic.tv.settings -> ").append(dlStr).append("\n")
+            } else {
+                sb.append("com.droidlogic.tv.settings -> NONE\n")
             }
         } catch (e: Exception) {
             sb.append("unavailable: ").append(e.message).append("\n")
         }
         sb.append("\n")
 
-        // 6. Packages
-        sb.append("--- [6. INSTALLED PACKAGES] ---\n")
+        // 8. Packages
+        sb.append("--- [8. INSTALLED PACKAGES] ---\n")
         try {
             val pm = context.packageManager
             val packages = pm.getInstalledPackages(PackageManager.GET_ACTIVITIES)
@@ -266,28 +282,11 @@ object DeviceReportCollector {
                     val enabled = pkg.applicationInfo.enabled
                     val hasLb = leanbackPkgs.contains(pkg.packageName)
                     val hasLch = launcherPkgs.contains(pkg.packageName)
-                    val sourceDir = pkg.applicationInfo.sourceDir ?: ""
-
-                    var catStr = "NONE"
-                    if (Build.VERSION.SDK_INT >= 26) {
-                        catStr = when (pkg.applicationInfo.category) {
-                            ApplicationInfo.CATEGORY_VIDEO -> "VIDEO"
-                            ApplicationInfo.CATEGORY_AUDIO -> "AUDIO"
-                            ApplicationInfo.CATEGORY_GAME -> "GAME"
-                            ApplicationInfo.CATEGORY_IMAGE -> "IMAGE"
-                            ApplicationInfo.CATEGORY_SOCIAL -> "SOCIAL"
-                            ApplicationInfo.CATEGORY_NEWS -> "NEWS"
-                            ApplicationInfo.CATEGORY_MAPS -> "MAPS"
-                            ApplicationInfo.CATEGORY_PRODUCTIVITY -> "PRODUCTIVITY"
-                            else -> "UNDEFINED"
-                        }
-                    }
 
                     sb.append("- ").append(pkg.packageName).append(" [").append(label).append("]\n")
                     sb.append("  ver=").append(pkg.versionName ?: "null").append(", type=").append(type)
-                    sb.append(", enabled=").append(enabled).append(", category=").append(catStr)
+                    sb.append(", enabled=").append(enabled)
                     sb.append(", leanback=").append(hasLb).append(", launcher=").append(hasLch).append("\n")
-                    sb.append("  path=").append(sourceDir).append("\n")
                 }
             }
             sb.append("Total Printed Packages: ").append(count).append("\n")
@@ -296,8 +295,8 @@ object DeviceReportCollector {
         }
         sb.append("\n")
 
-        // 7. Input
-        sb.append("--- [7. INPUT DEVICES & KEY LAYOUTS] ---\n")
+        // 9. Input
+        sb.append("--- [9. INPUT DEVICES & KEY LAYOUTS] ---\n")
         try {
             val deviceIds = InputDevice.getDeviceIds()
             sb.append("Input Devices (").append(deviceIds.size).append("):\n")
@@ -313,21 +312,6 @@ object DeviceReportCollector {
                 }
             }
 
-            sb.append("\n[Keylayout Files]\n")
-            listOf("/system/usr/keylayout", "/vendor/usr/keylayout", "/odm/usr/keylayout").forEach { dirPath ->
-                val dir = File(dirPath)
-                if (dir.exists() && dir.isDirectory) {
-                    sb.append("Directory ").append(dirPath).append(":\n")
-                    dir.listFiles()?.take(20)?.forEach { f ->
-                        sb.append("  ").append(f.name).append(" (").append(f.length()).append(" B)\n")
-                        val keyLines = readMatchingKeylayoutLines(f)
-                        if (keyLines.isNotEmpty()) {
-                            keyLines.forEach { line -> sb.append("    -> ").append(line).append("\n") }
-                        }
-                    }
-                }
-            }
-
             sb.append("\n[Recent Ring Buffer Key Events (last 30)]\n")
             val keyLogs = KeyEventBuffer.getFormattedLines()
             if (keyLogs.isNotEmpty()) {
@@ -340,86 +324,26 @@ object DeviceReportCollector {
         }
         sb.append("\n")
 
-        // 8. Settings State
-        sb.append("--- [8. SETTINGS & SERVICE STATE] ---\n")
+        // 10. Settings & Services
+        sb.append("--- [10. SETTINGS & SERVICE STATE] ---\n")
         try {
             val accServices = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: "none"
             val notifListeners = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners") ?: "none"
             val adb = Settings.Global.getInt(context.contentResolver, Settings.Global.ADB_ENABLED, 0)
-            val devSettings = Settings.Global.getInt(context.contentResolver, "development_settings_enabled", 0)
 
             sb.append("Accessibility Services Enabled: ").append(accServices).append("\n")
             sb.append("Notification Listeners Enabled: ").append(notifListeners).append("\n")
             sb.append("ADB Enabled: ").append(adb == 1).append("\n")
-            sb.append("Developer Settings Enabled: ").append(devSettings == 1).append("\n")
 
             sb.append("\n[Launcher Service Status]\n")
             sb.append("RemoteAccessibilityService: ").append(if (RemoteAccessibilityService.instance != null) "RUNNING" else "OFF").append("\n")
             sb.append("HomeKeyService: ").append(if (HomeKeyService.instance != null) "RUNNING" else "OFF").append("\n")
             sb.append("RemoteService: ").append(if (RemoteService.serverPort != 0) "RUNNING (port ${RemoteService.serverPort})" else "OFF").append("\n")
             sb.append("MediaListenerService: ").append(if (NowPlayingManager.isNotificationListenerEnabled(context)) "ENABLED" else "DISABLED").append("\n")
-
-            sb.append("\n[Granted Permissions]\n")
-            listOf(
-                android.Manifest.permission.INTERNET,
-                android.Manifest.permission.ACCESS_NETWORK_STATE,
-                android.Manifest.permission.QUERY_ALL_PACKAGES,
-                android.Manifest.permission.FOREGROUND_SERVICE,
-                "android.permission.POST_NOTIFICATIONS"
-            ).forEach { perm ->
-                val granted = context.checkCallingOrSelfPermission(perm) == PackageManager.PERMISSION_GRANTED
-                sb.append(" - ").append(perm).append(": ").append(if (granted) "GRANTED" else "DENIED").append("\n")
-            }
-        } catch (e: Exception) {
-            sb.append("unavailable: ").append(e.message).append("\n")
-        }
-        sb.append("\n")
-
-        // 9. Our App Info
-        sb.append("--- [9. LAUNCHER APP METADATA] ---\n")
-        try {
-            val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            sb.append("Package Name: ").append(context.packageName).append("\n")
-            sb.append("Version Name: ").append(pInfo.versionName).append("\n")
-            @Suppress("DEPRECATION")
-            sb.append("Version Code: ").append(if (Build.VERSION.SDK_INT >= 28) pInfo.longVersionCode else pInfo.versionCode.toLong()).append("\n")
-            sb.append("Target SDK: ").append(context.applicationInfo.targetSdkVersion).append("\n")
-            sb.append("First Install Time: ").append(sdf.format(Date(pInfo.firstInstallTime))).append("\n")
-            sb.append("Last Update Time: ").append(sdf.format(Date(pInfo.lastUpdateTime))).append("\n")
-        } catch (e: Exception) {
-            sb.append("unavailable: ").append(e.message).append("\n")
-        }
-        sb.append("\n")
-
-        // 10. Crash History
-        sb.append("--- [10. CRASH & LOGCAT HISTORY] ---\n")
-        try {
-            if (Build.VERSION.SDK_INT >= 30) {
-                val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-                val exitInfos = am?.getHistoricalProcessExitReasons(context.packageName, 0, 10)
-                if (exitInfos != null && exitInfos.isNotEmpty()) {
-                    sb.append("ApplicationExitInfo (last 10):\n")
-                    exitInfos.forEach { ei ->
-                        sb.append(" - [").append(sdf.format(Date(ei.timestamp))).append("] Reason=").append(ei.reason)
-                        sb.append(", Description=").append(ei.description ?: "none").append("\n")
-                    }
-                } else {
-                    sb.append("ApplicationExitInfo: None recorded\n")
-                }
-            }
-
-            sb.append("\n[Logcat Runtime & Fatal Lines (last 300)]\n")
-            val logcatLines = runLogcatFiltered()
-            if (logcatLines.isNotEmpty()) {
-                logcatLines.forEach { sb.append(it).append("\n") }
-            } else {
-                sb.append("No FATAL/AndroidRuntime lines found in logcat\n")
-            }
         } catch (e: Exception) {
             sb.append("unavailable: ").append(e.message).append("\n")
         }
 
-        // Apply Privacy Filters and Cap to 200 KB
         return sanitizeAndCap(sb.toString(), 200 * 1024)
     }
 
@@ -431,21 +355,6 @@ object DeviceReportCollector {
         } catch (e: Exception) {
             listOf("unavailable: ${e.message}")
         }
-    }
-
-    private fun readMatchingKeylayoutLines(file: File): List<String> {
-        val keywords = listOf("HOME", "MENU", "SETTINGS", "ALL_APPS", "INPUT", "ASSIST", "SEARCH", "TV", "GUIDE", "APP_SWITCH")
-        return try {
-            val result = ArrayList<String>()
-            file.useLines { lines ->
-                lines.forEach { line ->
-                    if (keywords.any { line.contains(it, ignoreCase = true) }) {
-                        result.add(line.trim())
-                    }
-                }
-            }
-            result.take(15)
-        } catch (_: Exception) { emptyList() }
     }
 
     private fun runGetpropFiltered(): List<String> {
@@ -468,25 +377,6 @@ object DeviceReportCollector {
                 lines.filter { line ->
                     prefixList.any { prefix -> line.trim().startsWith("[$prefix") || line.trim().startsWith(prefix) }
                 }.take(100).toList()
-            }
-        } catch (e: Exception) {
-            listOf("unavailable: ${e.message}")
-        }
-    }
-
-    private fun runLogcatFiltered(): List<String> {
-        return try {
-            val process = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-t", "300"))
-            val completed = process.waitFor(3, TimeUnit.SECONDS)
-            if (!completed) {
-                process.destroy()
-                return listOf("unavailable: logcat timeout")
-            }
-
-            process.inputStream.bufferedReader().useLines { lines ->
-                lines.filter { line ->
-                    line.contains("AndroidRuntime", ignoreCase = true) || line.contains("FATAL", ignoreCase = true)
-                }.take(50).toList()
             }
         } catch (e: Exception) {
             listOf("unavailable: ${e.message}")

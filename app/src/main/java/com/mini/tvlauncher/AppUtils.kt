@@ -261,9 +261,14 @@ object AppUtils {
             if (scaledBmp != decodedBmp) decodedBmp.recycle()
 
             val targetFile = File(cardsDir, "$pkg.jpg")
-            targetFile.outputStream().use { out ->
-                scaledBmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
-            }
+            var quality = 85
+            do {
+                targetFile.outputStream().use { out ->
+                    scaledBmp.compress(Bitmap.CompressFormat.JPEG, quality, out)
+                }
+                quality -= 10
+            } while (targetFile.length() > 400 * 1024 && quality >= 20)
+
             scaledBmp.recycle()
             true
         } catch (_: Exception) { false }
@@ -311,16 +316,21 @@ object AppUtils {
             if (options.outWidth <= 0 || options.outHeight <= 0) return null
 
             var sampleSize = 1
-            while (options.outWidth / (sampleSize * 2) >= 1920) sampleSize *= 2
+            while (options.outWidth / (sampleSize * 2) >= 1280) sampleSize *= 2
 
             val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
             val decodedBmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, decodeOpts) ?: return null
 
             val dir = getWallpaperDir(filesDir)
             val file = File(dir, "$idToUse.jpg")
-            file.outputStream().use { out ->
-                decodedBmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
-            }
+            var quality = 85
+            do {
+                file.outputStream().use { out ->
+                    decodedBmp.compress(Bitmap.CompressFormat.JPEG, quality, out)
+                }
+                quality -= 10
+            } while (file.length() > 400 * 1024 && quality >= 20)
+
             decodedBmp.recycle()
             idToUse
         } catch (_: Exception) {
